@@ -29,6 +29,21 @@ Configure build:\
 Compile library:\
 ```cmake --build .```
 
+## Add to your project
+
+To add this library to your CMake project, add the following to the `CMakeLists.txt`:
+
+``` cmake
+# Add Scailable C Utilities library
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/path/to/sclbl-utilities)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/path/to/sclbl-utilities/include)
+target_link_libraries(<target> sclbl-c-utilities)
+```
+
+- `add_subdirectory` tells your project where to find the Scailable C Utilities library.
+- `include_directores` tells your project where to find the header files. This allows you to call the utility functions from your source files.
+- `target_link_libraries` links the library to your target. This also ensures that the library will be built when you build your target.
+
 ## Licence
 
 Copyright 2023, Scailable, All rights reserved.
