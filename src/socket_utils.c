@@ -17,7 +17,7 @@
 bool sclbl_socket_interrupt_signal = false;
 
 // Create timeout structure for socket connections
-struct timeval tv = { .tv_sec = 5, .tv_usec = 0 };
+static struct timeval tv = { .tv_sec = 5, .tv_usec = 0 };
 
 /**
  * @brief Listen on socket for incoming messages
@@ -73,11 +73,12 @@ void sclbl_socket_start_listener( const char *socket_path, void ( *callback_func
     // Listen in a loop
     while ( sclbl_socket_interrupt_signal == 0 ) {
         // Wait for incoming connection
+        setsockopt( sfd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv, sizeof tv );
         int cfd = accept( sfd, NULL, NULL );
         // Set timeout for socket receive
-        setsockopt( cfd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv, sizeof tv );
 
         // Read message header, which tells us the full message length
+        setsockopt( cfd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv, sizeof tv );
         num_read = recv( cfd, &message_length, MSG_HEADER_LENGTH, flags );
         if ( (size_t) num_read != MSG_HEADER_LENGTH ) {
             continue;
