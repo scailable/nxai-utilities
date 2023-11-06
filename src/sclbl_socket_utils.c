@@ -265,6 +265,17 @@ void sclbl_socket_send( const char *socket_path, const char *message_to_send, ui
         return;
     }
 
+    // Send message to newly created socket
+    sclbl_socket_send_to_socket(socket_fd, message_to_send, message_length);
+
+    // Close socket
+    close( socket_fd );
+}
+
+bool sclbl_socket_send_to_socket(const int socket_fd, const char *message_to_send, uint32_t message_length) {
+
+    setsockopt( socket_fd, SOL_SOCKET, SO_SNDTIMEO, (const char *) &tv, sizeof tv );
+
     const int32_t flags = MSG_NOSIGNAL;
 
     size_t header_sent_total = 0;
@@ -273,13 +284,13 @@ void sclbl_socket_send( const char *socket_path, const char *message_to_send, ui
         sent_now = send( socket_fd, ( (char *) &message_length ) + header_sent_total, sizeof( message_length ) - header_sent_total, flags );
         if ( sent_now == -1 ) {
             fprintf(stderr, "Warning: send to sclblmod socket failed\n" );
-            close( socket_fd );
-            return;
+            return false;
         }
     }
 
     if ( header_sent_total != sizeof( message_length ) ) {
         fprintf(stderr, "Warning: Could not send header!\n" );
+        return false;
     }
 
     // Send string message
@@ -289,11 +300,9 @@ void sclbl_socket_send( const char *socket_path, const char *message_to_send, ui
                          message_length - sent_total, flags );
         if ( sent_now == -1 ) {
             fprintf(stderr, "Warning: send to sclblmod socket failed\n" );
-            close( socket_fd );
-            return;
+            return false;
         }
     }
 
-    // Close socket
-    close( socket_fd );
+    return true;
 }
