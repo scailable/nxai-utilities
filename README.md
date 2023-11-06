@@ -44,6 +44,27 @@ target_link_libraries(<target> sclbl-c-utilities)
 - `include_directores` tells your project where to find the header files. This allows you to call the utility functions from your source files.
 - `target_link_libraries` links the library to your target. This also ensures that the library will be built when you build your target.
 
+## GitLab CI/CD
+
+If you have CI/CD enabled in your project which makes use of this repository, you need to instruct the CI/CD pipeline to also pull submodules. You can do this by adding the following variables, either per job or globally in the file:
+
+``` yaml
+variables:
+  GIT_SUBMODULE_STRATEGY: normal
+  GIT_SUBMODULE_FORCE_HTTPS: "true"
+  GIT_SUBMODULE_DEPTH: 1
+```
+
+The second step is to give your project access rights to use this project in CI/CD. This project has restricted access for CI/CD jobs, so each project that uses it must be added manually. \
+To do this: 
+
+1. Navigate to this project in GitLab
+2. Navigate to `Settings` -> `CI/CD`
+3. Navigate to `Token Access`
+4. Add the path to your project starting with `scailable/`
+
+Your project should now be able to pull the project and use it during CI/CD jobs.
+
 ## Licence
 
 Copyright 2023, Scailable, All rights reserved.
