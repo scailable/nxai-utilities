@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -161,6 +162,9 @@ void sclbl_socket_start_listener( const char *socket_path, void ( *callback_func
         fprintf(stderr, "Error: Sender socket listen error. Exiting.\n" );
         return;
     }
+
+    // Change file permissions so anyone can write to it
+    chmod(socket_path, S_IRGRP | S_IRUSR | S_IROTH | S_IWGRP | S_IWOTH | S_IWUSR);
 
     size_t num_read_cumulitive = 0;
     ssize_t num_read;
