@@ -16,6 +16,8 @@ void sclbl_socket_send( const char *socket_path, const char *string_to_send, uin
 
 char* sclbl_socket_send_receive_message(const char *socket_path, const char *string_to_send, const uint32_t output_message_length);
 
+bool sclbl_socket_send_to_socket(const int socket_fd, const char *message_to_send, uint32_t message_length);
+
 #ifdef __cplusplus
 }
 #endif
