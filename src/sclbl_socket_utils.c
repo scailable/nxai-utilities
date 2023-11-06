@@ -127,7 +127,7 @@ char* sclbl_socket_send_receive_message(const char *socket_path, const char *mes
  * @brief Listen on socket for incoming messages
  *
  */
-void sclbl_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t ) ) {
+void sclbl_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t, int ) ) {
     // Init socket to receive data
     struct sockaddr_un addr;
 
@@ -214,7 +214,7 @@ void sclbl_socket_start_listener( const char *socket_path, void ( *callback_func
         }
 
         if ( sclbl_socket_interrupt_signal == false ) {
-            callback_function( message_input_buffer, message_length );
+            callback_function( message_input_buffer, message_length, connection_fd );
         }
 
         // Close connection
