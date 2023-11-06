@@ -12,7 +12,9 @@ extern bool sclbl_socket_interrupt_signal;
 
 void sclbl_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t ) );
 
-void sclbl_socket_send( const char *socket_path, const char *string_to_send );
+void sclbl_socket_send( const char *socket_path, const char *string_to_send, uint32_t message_length );
+
+char* sclbl_socket_send_receive_message(const char *socket_path, const char *string_to_send, const uint32_t output_message_length);
 
 #ifdef __cplusplus
 }
