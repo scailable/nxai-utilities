@@ -1,4 +1,4 @@
-#include "socket_utils.h"
+#include "sclbl_socket_utils.h"
 
 #include <errno.h>
 #include <stdbool.h>
@@ -60,7 +60,7 @@ void sclbl_socket_start_listener( const char *socket_path, void ( *callback_func
     }
 
     size_t num_read_cumulitive = 0;
-    size_t MSG_HEADER_LENGTH = 4;
+    const size_t MSG_HEADER_LENGTH = 4;
     ssize_t num_read;
     const int flags = MSG_NOSIGNAL;
 
@@ -128,7 +128,7 @@ void sclbl_socket_start_listener( const char *socket_path, void ( *callback_func
  * @param socket_path Path to socket
  * @param string_to_send String to send
  */
-void sclbl_socket_send( const char *socket_path, const char *string_to_send, const char *raw_data, size_t raw_data_length ) {
+void sclbl_socket_send( const char *socket_path, const char *string_to_send) {
 
     // Create new socket
     int32_t socket_fd = socket( AF_UNIX, SOCK_STREAM, 0 );
@@ -187,22 +187,6 @@ void sclbl_socket_send( const char *socket_path, const char *string_to_send, con
     for ( ssize_t sent_now = 0; sent_total < message_length; sent_total += (size_t) sent_now ) {
         sent_now = send( socket_fd, ( (char *) string_to_send ) + sent_total,
                          message_length - sent_total, flags );
-        if ( sent_now == -1 ) {
-            printf( "Warning: send to sclblmod socket failed\n" );
-            close( socket_fd );
-            return;
-        }
-    }
-
-    if ( raw_data == NULL ) {
-        close( socket_fd );
-        return;
-    }
-
-    // Send raw data
-    sent_total = 0;
-    for ( ssize_t sent_now = 0; sent_total < raw_data_length; sent_total += (size_t) sent_now ) {
-        sent_now = send( socket_fd, ( raw_data ) + sent_total, raw_data_length - sent_total, flags );
         if ( sent_now == -1 ) {
             printf( "Warning: send to sclblmod socket failed\n" );
             close( socket_fd );
