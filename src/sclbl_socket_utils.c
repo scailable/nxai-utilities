@@ -102,9 +102,9 @@ char* sclbl_socket_send_receive_message(const char *socket_path, const char *mes
     char* output_string = malloc(input_message_length);
 
     // receive
-    ssize_t num_read_cumulative = 0;
+    size_t num_read_cumulative = 0;
     while ((num_read = recv(socket_fd, output_string + num_read_cumulative, input_message_length - num_read_cumulative, flags)) > 0) {
-        num_read_cumulative += num_read;
+        num_read_cumulative += (size_t) num_read;
 
         // When multiple stacked input messages, it's possible for the socket to read further than the current message. So hard break.
         if (num_read_cumulative == input_message_length) {
