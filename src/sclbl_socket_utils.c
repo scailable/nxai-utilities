@@ -241,6 +241,11 @@ void sclbl_socket_start_listener( const char *socket_path, void ( *callback_func
         
         int connection_fd = sclbl_socket_await_message(socket_fd, &allocated_buffer_size, &message_input_buffer, &message_length);
 
+        if (connection_fd == -1) {
+            // Socket likely timed out, start waiting again ( effectively checking for interrupt signal )
+            continue;
+        }
+
         if ( sclbl_socket_interrupt_signal == false ) {
             callback_function( message_input_buffer, message_length, connection_fd );
         }
