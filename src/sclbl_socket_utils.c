@@ -47,14 +47,14 @@ char* sclbl_socket_send_receive_message(const char *socket_path, const char *mes
 
     // Check if we have access to socket
     if ( access( socket_path, F_OK ) != 0 ) {
-        fprintf( stderr,"Warning: access to sclblmod socket failed at %s\n", socket_path );
+        fprintf( stderr,"Warning: access to socket failed at %s\n", socket_path );
         close( socket_fd );
         return NULL;
     }
 
     // Connect to socket
     if ( connect( socket_fd, (struct sockaddr *) &addr,sizeof( struct sockaddr_un ) ) == -1 ) {
-        fprintf(stderr, "Warning: connect to sclblmod socket failed\n" );
+        fprintf(stderr, "Warning: connect to socket failed\n" );
         close( socket_fd );
         return NULL;
     }
@@ -68,7 +68,7 @@ char* sclbl_socket_send_receive_message(const char *socket_path, const char *mes
         sent_now = send( socket_fd, ( (char *) &output_message_length ) + header_sent_total,
                          sizeof( output_message_length ) - header_sent_total, flags );
         if ( sent_now == -1 ) {
-            fprintf(stderr, "Warning: send to sclblmod socket failed\n" );
+            fprintf(stderr, "Warning: send to socket failed\n" );
             close( socket_fd );
             return NULL;
         }
@@ -83,7 +83,7 @@ char* sclbl_socket_send_receive_message(const char *socket_path, const char *mes
     for ( ssize_t sent_now = 0; sent_total < output_message_length; sent_total += (size_t) sent_now ) {
         sent_now = send( socket_fd, ( (char *) message_to_send ) + sent_total, output_message_length - sent_total, flags );
         if ( sent_now == -1 ) {
-            fprintf( stderr,"Warning: send to sclblmod socket failed\n" );
+            fprintf( stderr,"Warning: send to socket failed\n" );
             close( socket_fd );
             return NULL;
         }
@@ -94,7 +94,7 @@ char* sclbl_socket_send_receive_message(const char *socket_path, const char *mes
     // Read message header, which tells us the full message length
     num_read = recv(socket_fd, &input_message_length, MESSAGE_HEADER_LENGTH, flags);
     if ((size_t) num_read != MESSAGE_HEADER_LENGTH) {
-        fprintf(stderr,"Warning: Sclblmod Socket Invalid socket header received. Ignoring.\n");
+        fprintf(stderr,"Warning: Socket Invalid socket header received. Ignoring.\n");
         close(socket_fd);
         return NULL;
     }
@@ -258,12 +258,6 @@ void sclbl_socket_start_listener( const char *socket_path, void ( *callback_func
     free( message_input_buffer );
 }
 
-/**
- * @brief Send a string to a socket
- *
- * @param socket_path Path to socket
- * @param message_to_send String to send
- */
 void sclbl_socket_send( const char *socket_path, const char *message_to_send, uint32_t message_length) {
 
     // Create new socket
@@ -284,7 +278,7 @@ void sclbl_socket_send( const char *socket_path, const char *message_to_send, ui
 
     // Check if we have access to socket
     if ( access( socket_path, F_OK ) != 0 ) {
-        fprintf(stderr, "Warning: access to sclblmod socket failed at %s\n", socket_path );
+        fprintf(stderr, "Warning: access to socket failed at %s\n", socket_path );
         close( socket_fd );
         return;
     }
@@ -293,7 +287,7 @@ void sclbl_socket_send( const char *socket_path, const char *message_to_send, ui
     if ( connect( socket_fd, (struct sockaddr *) &addr,
                   sizeof( struct sockaddr_un ) )
          == -1 ) {
-        fprintf(stderr, "Warning: connect to sclblmod socket failed\n" );
+        fprintf(stderr, "Warning: connect to socket failed\n" );
         close( socket_fd );
         return;
     }
@@ -316,7 +310,7 @@ bool sclbl_socket_send_to_socket(const int socket_fd, const char *message_to_sen
     for ( ssize_t sent_now = 0; header_sent_total < sizeof( message_length ); header_sent_total += (size_t) sent_now ) {
         sent_now = send( socket_fd, ( (char *) &message_length ) + header_sent_total, sizeof( message_length ) - header_sent_total, flags );
         if ( sent_now == -1 ) {
-            fprintf(stderr, "Warning: send to sclblmod socket failed\n" );
+            fprintf(stderr, "Warning: send to socket failed\n" );
             return false;
         }
     }
@@ -332,7 +326,7 @@ bool sclbl_socket_send_to_socket(const int socket_fd, const char *message_to_sen
         sent_now = send( socket_fd, ( (char *) message_to_send ) + sent_total,
                          message_length - sent_total, flags );
         if ( sent_now == -1 ) {
-            fprintf(stderr, "Warning: send to sclblmod socket failed\n" );
+            fprintf(stderr, "Warning: send to socket failed\n" );
             return false;
         }
     }
