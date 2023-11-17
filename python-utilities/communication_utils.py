@@ -6,17 +6,32 @@ import time
 import json
 
 def patchSettings(settings_contents: dict, uiprovider_url = "http://127.0.0.1:8081") -> bool:
-    print("Loading test settings...")
-    # Send test settings as a PATCH request
+    """
+    This function sends a PATCH request to update settings on a UI provider.
+    
+    Args:
+        settings_contents (dict): The settings to be updated. This should be a dictionary where the keys are the setting names and the values are the new settings.
+        uiprovider_url (str, optional): The URL of the UI provider. Defaults to "http://127.0.0.1:8081".
+    
+    Returns:
+        bool: True if the PATCH request was successful, False otherwise.
+    """
+    print("Loading test settings...")  # Print a loading message
+
+    # Try to send the test settings as a PATCH request
     try:
+        # Formulate the PATCH request
         response = requests.patch(uiprovider_url + "/settings", data=settings_contents)
-        response.raise_for_status()  # raise exception for non-2xx status codes
+        response.raise_for_status()  # Raise an exception if the response indicates an unsuccessful status code (non-2xx)
     except requests.exceptions.Timeout:
-        print("Request timed out")
+        print("Request timed out")  # If the request times out, print an error message and return False
         return False
     except requests.exceptions.RequestException as e:
+        # If there is a different request exception, print the error message and return False
         print("Error:", e)
         return False
+
+    # If the PATCH request was successful, return True
     return True
 
 def startUnixSocketServer(socket_path = "/opt/sclbl/sockets/output_socket.sock") -> socket.socket:
