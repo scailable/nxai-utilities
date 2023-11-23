@@ -27,7 +27,7 @@ bool sclbl_socket_interrupt_signal = false;
 static struct timeval tv = { .tv_sec = 5, .tv_usec = 0 };
 
 // TODO: Add functionality to reuse buffer for return message #3
-char* sclbl_socket_send_receive_message(const char *socket_path, const char *message_to_send, const uint32_t output_message_length){ 
+char* sclbl_socket_send_receive_message(const char *socket_path, const char *message_to_send, const uint32_t output_message_length, uint32_t *return_message_length){ 
     // Create new socket
     int32_t socket_fd = socket( AF_UNIX, SOCK_STREAM, 0 );
     if ( socket_fd < 0 ) {
@@ -78,7 +78,7 @@ char* sclbl_socket_send_receive_message(const char *socket_path, const char *mes
         fprintf(stderr, "Warning: Could not send header!\n" );
     }
 
-    // Send string message
+    // Send message
     size_t sent_total = 0;
     for ( ssize_t sent_now = 0; sent_total < output_message_length; sent_total += (size_t) sent_now ) {
         sent_now = send( socket_fd, ( (char *) message_to_send ) + sent_total, output_message_length - sent_total, flags );
@@ -100,11 +100,11 @@ char* sclbl_socket_send_receive_message(const char *socket_path, const char *mes
     }
 
     // Allocate necessary space for incoming message
-    char* output_string = malloc(input_message_length);
+    char* output_message = malloc(input_message_length);
 
     // receive
     size_t num_read_cumulative = 0;
-    while ((num_read = recv(socket_fd, output_string + num_read_cumulative, input_message_length - num_read_cumulative, flags)) > 0) {
+    while ((num_read = recv(socket_fd, output_message + num_read_cumulative, input_message_length - num_read_cumulative, flags)) > 0) {
         num_read_cumulative += (size_t) num_read;
 
         // When multiple stacked input messages, it's possible for the socket to read further than the current message. So hard break.
@@ -116,13 +116,15 @@ char* sclbl_socket_send_receive_message(const char *socket_path, const char *mes
 
     if ( num_read == -1 ) {
         fprintf(stderr, "Warning: Error when receiving socket message!\n" );
-        free(output_string);
+        free(output_message);
         return NULL;
     }
 
     // Close socket connection
     close(socket_fd);
-    return output_string;
+
+    *return_message_length = input_message_length;
+    return output_message;
 }
 
 int sclbl_socket_create_listener(const char *socket_path) {
@@ -320,7 +322,7 @@ bool sclbl_socket_send_to_socket(const int socket_fd, const char *message_to_sen
         return false;
     }
 
-    // Send string message
+    // Send message
     size_t sent_total = 0;
     for ( ssize_t sent_now = 0; sent_total < message_length; sent_total += (size_t) sent_now ) {
         sent_now = send( socket_fd, ( (char *) message_to_send ) + sent_total,
