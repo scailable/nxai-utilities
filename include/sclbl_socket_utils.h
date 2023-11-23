@@ -94,10 +94,11 @@ void sclbl_socket_send( const char *socket_path, const char *string_to_send, uin
  * \param socket_path The file system path to the socket.
  * \param message_to_send The message to send to the socket.
  * \param output_message_length The length of the message to send.
+ * \param return_message_length The length of the message returned.
  *
  * \return A pointer to the received message, or NULL if any step fails.
  */
-char *sclbl_socket_send_receive_message( const char *socket_path, const char *string_to_send, const uint32_t output_message_length );
+char *sclbl_socket_send_receive_message( const char *socket_path, const char *string_to_send, const uint32_t output_message_length, uint32_t *return_message_length );
 
 /**
  * @brief Sends a message to a socket
