@@ -38,6 +38,21 @@ extern bool sclbl_socket_interrupt_signal;
 int sclbl_socket_create_listener( const char *socket_path );
 
 /**
+ * @brief Receives a socket message on a given connection.
+ * 
+ * This function reads a message header from the socket, which specifies the full length of the message.
+ * If the incoming message is larger than the allocated buffer size, or if the input buffer is NULL, 
+ * the function reallocates the buffer to fit the message. It then reads the message into the buffer.
+ * If an error occurs during socket reading, a warning message is printed to stderr.
+ *
+ * @param connection_fd The file descriptor for the connection on which to receive messages.
+ * @param allocated_buffer_size A pointer to the size of the allocated buffer.
+ * @param message_input_buffer A pointer to the input buffer in which to store the received message.
+ * @param message_length A pointer to a variable in which to store the length of the received message.
+ */
+void sclbl_socket_receive_on_connection( int connection_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length );
+
+/**
  * \brief Waits for an incoming socket message, reads it and saves it to the provided buffer.
  *
  * \details This function waits for an incoming connection on a given socket file descriptor, 
@@ -75,6 +90,20 @@ int sclbl_socket_await_message( int socket_fd, size_t *allocated_buffer_size, ch
 void sclbl_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t, int ) );
 
 /**
+ * @brief Connects to a Unix domain socket at a given path.
+ * 
+ * This function creates a new socket and attempts to connect it to the 
+ * Unix domain socket located at the provided path. The function sets 
+ * send and receive timeout options for the socket, checks for access 
+ * to the socket, and then attempts to connect.
+ * 
+ * @param socket_path The file system path to the Unix domain socket.
+ * 
+ * @return socket_fd on successful connection, -1 on any failure.
+ */
+int32_t sclbl_socket_connect( const char *socket_path );
+
+/**
  * @brief Send a string to a socket
  *
  * @param socket_path Path to socket
@@ -107,13 +136,13 @@ char *sclbl_socket_send_receive_message( const char *socket_path, const char *st
  * of the function. It first sets the socket options, then sends the length of the message as a header 
  * and finally sends the actual message. If any of the send operations fail, the function will return false.
  *
- * @param socket_fd The file descriptor of the socket to send the message to
+ * @param connection_fd The file descriptor of the connection to send the message to
  * @param message_to_send The message to be sent to the socket
  * @param message_length The length of the message to be sent
  *
  * @return true if the message was successfully sent, false otherwise
  */
-bool sclbl_socket_send_to_socket( const int socket_fd, const char *message_to_send, uint32_t message_length );
+bool sclbl_socket_send_to_connection( const int connection_fd, const char *message_to_send, uint32_t message_length );
 
 #ifdef __cplusplus
 }
