@@ -5,14 +5,17 @@ import socket
 import time
 import json
 
-def patchSettings(settings_contents: dict, uiprovider_url = "http://127.0.0.1:8081") -> bool:
+
+def patchSettings(
+    settings_contents: dict, uiprovider_url="http://127.0.0.1:8081"
+) -> bool:
     """
     This function sends a PATCH request to update settings on a UI provider.
-    
+
     Args:
         settings_contents (dict): The settings to be updated. This should be a dictionary where the keys are the setting names and the values are the new settings.
         uiprovider_url (str, optional): The URL of the UI provider. Defaults to "http://127.0.0.1:8081".
-    
+
     Returns:
         bool: True if the PATCH request was successful, False otherwise.
     """
@@ -24,7 +27,9 @@ def patchSettings(settings_contents: dict, uiprovider_url = "http://127.0.0.1:80
         response = requests.patch(uiprovider_url + "/settings", data=settings_contents)
         response.raise_for_status()  # Raise an exception if the response indicates an unsuccessful status code (non-2xx)
     except requests.exceptions.Timeout:
-        print("Request timed out")  # If the request times out, print an error message and return False
+        print(
+            "Request timed out"
+        )  # If the request times out, print an error message and return False
         return False
     except requests.exceptions.RequestException as e:
         # If there is a different request exception, print the error message and return False
@@ -34,12 +39,15 @@ def patchSettings(settings_contents: dict, uiprovider_url = "http://127.0.0.1:80
     # If the PATCH request was successful, return True
     return True
 
-def startUnixSocketServer(socket_path = "/opt/sclbl/sockets/output_socket.sock") -> socket.socket:
+
+def startUnixSocketServer(
+    socket_path="/opt/sclbl/sockets/output_socket.sock",
+) -> socket.socket:
     """
     This function creates and starts a Unix socket server.
 
     Parameters:
-    socket_path (str): The path where the Unix socket file is to be created. 
+    socket_path (str): The path where the Unix socket file is to be created.
                        Default is "/opt/sclbl/sockets/output_socket.sock"
 
     Returns:
@@ -48,8 +56,8 @@ def startUnixSocketServer(socket_path = "/opt/sclbl/sockets/output_socket.sock")
     The function first deletes the socket file at the given path if it already exists.
     It then creates a new Unix socket server and binds it to the given path.
     Finally, it makes the server listen for incoming connections.
-    
-    If an OSError occurs during the deletion of the existing socket file, the function checks 
+
+    If an OSError occurs during the deletion of the existing socket file, the function checks
     if the file still exists. If it does, the OSError is raised again.
 
     Example usage:
@@ -77,7 +85,37 @@ def startUnixSocketServer(socket_path = "/opt/sclbl/sockets/output_socket.sock")
     return server
 
 
-def waitForSocketMessage(server: socket.socket, timeout=10) -> (str,socket.socket):
+def receiveMessageOverConnection(connection) -> str:
+    """
+    Receives a message over a network connection.
+
+    This function first receives 4 bytes of data from the client which it interprets
+    as an unsigned integer representing the length of the incoming message. It then
+    continuously receives data until the total length of the received data matches the
+    message length. If no data is received in a round, it breaks the loop. Finally, it
+    decodes the received bytes into a UTF-8 string and returns it.
+
+    :param connection: The network connection over which to receive the message
+    :type connection: socket
+    :return: The received message decoded as a UTF-8 string
+    :rtype: str
+    """
+    data = connection.recv(4)
+    message_length = struct.unpack("<I", data)[0]
+
+    data_received = 0
+    data: bytes = b""
+    while data_received < message_length:
+        data += connection.recv(message_length - data_received)
+        data_received = len(data)
+        if not data:
+            break
+
+    decoded = data.decode("utf-8")
+    return decoded
+
+
+def waitForSocketMessage(server: socket.socket, timeout=10) -> (str, socket.socket):
     """
     This function waits for a message to be received on a socket server.
 
@@ -96,28 +134,18 @@ def waitForSocketMessage(server: socket.socket, timeout=10) -> (str,socket.socke
     server.settimeout(timeout)  # timeout for listening
     connection, _ = server.accept()
     connection.settimeout(timeout)  # timeout for receiving data
-    # receive data from the client
-    data = connection.recv(4)
-    message_length = struct.unpack("<I", data)[0]
+    # Receive the message
+    decoded = receiveMessageOverConnection(connection)
 
-    data_received = 0
-    data: bytes = b""
-    while data_received < message_length:
-        data += connection.recv(message_length - data_received)
-        data_received = len(data)
-        if not data:
-            break
+    return decoded, connection
 
-    decoded = data.decode("utf-8")
-
-    return decoded,connection
 
 def sendMessageOverConnection(connection: socket.socket, message: str):
     """
     Sends a message over a socket connection.
 
-    This function takes a socket connection and a message as input. 
-    The message is converted into bytes, and its length is calculated. 
+    This function takes a socket connection and a message as input.
+    The message is converted into bytes, and its length is calculated.
     Both the length of the message and the message itself are sent over the connection.
 
     Parameters:
@@ -150,11 +178,13 @@ def sendMessageOverConnection(connection: socket.socket, message: str):
     connection.sendall(message_bytes)
 
 
-def sendSocketMessage(message: str, sclbl_input_socket_path: str = "/opt/sclbl/sockets/sclblmod.sock"):
+def sendSocketMessage(
+    message: str, sclbl_input_socket_path: str = "/opt/sclbl/sockets/sclblmod.sock"
+):
     """
     Sends a message through a socket connection to a specified Unix socket path.
 
-    :param message: The message to be sent over the socket connection. 
+    :param message: The message to be sent over the socket connection.
     :type message: str
     :param sclbl_input_socket_path: The path to the Unix socket. Default is "/opt/sclbl/sockets/sclblmod.sock".
     :type sclbl_input_socket_path: str
@@ -167,7 +197,11 @@ def sendSocketMessage(message: str, sclbl_input_socket_path: str = "/opt/sclbl/s
     client.close()
 
 
-def sendSocketBytes(message: str, bytes_array: bytes, sclbl_input_socket_path: str = "/opt/sclbl/sockets/sclblmod.sock"):
+def sendSocketBytes(
+    message: str,
+    bytes_array: bytes,
+    sclbl_input_socket_path: str = "/opt/sclbl/sockets/sclblmod.sock",
+):
     """
     Sends a string message and binary data to a specified Unix socket.
 
@@ -195,7 +229,8 @@ def sendSocketBytes(message: str, bytes_array: bytes, sclbl_input_socket_path: s
     client.sendall(bytes_array)
     client.close()
 
-def startScailableRuntime(uiprovider_url = "http://127.0.0.1:8081"):
+
+def startScailableRuntime(uiprovider_url="http://127.0.0.1:8081"):
     """
     Starts the Scailable Runtime by making a GET request to the provided URL.
 
@@ -203,9 +238,10 @@ def startScailableRuntime(uiprovider_url = "http://127.0.0.1:8081"):
     :type uiprovider_url: str
     :return: The response from the GET request.
     """
-    return executeGetRequest(uiprovider_url+"/start", timeout=10)
+    return executeGetRequest(uiprovider_url + "/start", timeout=10)
 
-def stopScailableRuntime(uiprovider_url = "http://127.0.0.1:8081"):
+
+def stopScailableRuntime(uiprovider_url="http://127.0.0.1:8081"):
     """
     Sends a GET request to stop the Scailable runtime.
 
@@ -213,9 +249,10 @@ def stopScailableRuntime(uiprovider_url = "http://127.0.0.1:8081"):
     :type uiprovider_url: str
     :return: The response from the GET request.
     """
-    return executeGetRequest(uiprovider_url+"/stop", timeout=10)
+    return executeGetRequest(uiprovider_url + "/stop", timeout=10)
 
-def getScailableSettings(uiprovider_url = "http://127.0.0.1:8081") -> dict:
+
+def getScailableSettings(uiprovider_url="http://127.0.0.1:8081") -> dict:
     """
     Sends a GET request to the provided UI provider URL to retrieve settings and returns them as a dictionary.
 
@@ -224,11 +261,12 @@ def getScailableSettings(uiprovider_url = "http://127.0.0.1:8081") -> dict:
     :return: A dictionary containing the settings retrieved from the UI provider.
     :rtype: dict
     """
-    response = executeGetRequest(uiprovider_url+"/settings", timeout=10)
+    response = executeGetRequest(uiprovider_url + "/settings", timeout=10)
     settings_object = json.loads(response.text)
     return settings_object
 
-def getScailableStatus(uiprovider_url = "http://127.0.0.1:8081") -> dict:
+
+def getScailableStatus(uiprovider_url="http://127.0.0.1:8081") -> dict:
     """
     Sends a GET request to the specified URL and returns the response as a dictionary.
 
@@ -237,15 +275,16 @@ def getScailableStatus(uiprovider_url = "http://127.0.0.1:8081") -> dict:
     :return: The response from the GET request as a dictionary.
     :rtype: dict
     """
-    response = executeGetRequest(uiprovider_url+"/status", timeout=10)
+    response = executeGetRequest(uiprovider_url + "/status", timeout=10)
     settings_object = json.loads(response.text)
     return settings_object
+
 
 def executeGetRequest(url, timeout=10):
     """
     Executes a GET request to a specified URL with a timeout.
 
-    This function sends a GET request to the provided URL and returns the response. 
+    This function sends a GET request to the provided URL and returns the response.
     If the request times out or if there's an error with the request, it raises an exception.
 
     :param url: The URL to send the GET request to.
