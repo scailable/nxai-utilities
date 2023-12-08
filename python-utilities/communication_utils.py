@@ -4,6 +4,7 @@ import struct
 import socket
 import time
 import json
+import sysv_ipc as ipc
 
 
 def patchSettings(
@@ -311,3 +312,29 @@ def executeGetRequest(url, timeout=10):
         )
     except requests.exceptions.RequestException as e:
         raise Exception(f"Request error: {e}. \n URL: {url}")
+
+
+def read_shm(shm_key: int) -> bytes:
+    """
+    Reads data from a shared memory segment using a given key.
+
+    :param shm_key: The key of the shared memory segment to read from.
+    :return: The raw data read from the shared memory.
+
+    The function first attaches to the shared memory using the provided key.
+    It then reads the size of the data to be read from the first 4 bytes of the shared memory.
+    The function then reads the data of the specified size from the shared memory.
+    Finally, it detaches from the shared memory and returns the raw data read from the memory.
+    """
+    # Attach shared memory using key
+    shm = ipc.SharedMemory(shm_key, 0, 0)
+    # Read header which is always the size of the following message
+    size_buf = shm.read(4)
+    # Parse header to number
+    data_size = struct.unpack("<I", size_buf)[0]
+    # Read data of size
+    buf = shm.read(data_size, offset=4)
+    # Detach from memory again
+    shm.detach()
+    # Return the raw data read from memory
+    return buf
