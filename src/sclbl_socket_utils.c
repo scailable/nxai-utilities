@@ -59,15 +59,15 @@ int sclbl_socket_create_listener( const char *socket_path ) {
     // Create socket to listen on
     int socket_fd = socket( AF_UNIX, SOCK_STREAM, 0 );
     if ( socket_fd == -1 ) {
-        fprintf( stderr, "Error: Sender socket error.\n" );
+        printf("Error: Sender socket error.\n" );
         return -1;
     }
     if ( strlen( socket_path ) > sizeof( addr.sun_path ) - 1 ) {
-        fprintf( stderr, "Error: Sender socket path too long error.\n" );
+        printf("Error: Sender socket path too long error.\n" );
         return -1;
     }
     if ( remove( socket_path ) == -1 && errno != ENOENT ) {
-        fprintf( stderr, "Error: Sender remove socket error.\n" );
+        printf("Error: Sender remove socket error.\n" );
         return -1;
     }
     memset( &addr, 0, sizeof( struct sockaddr_un ) );
@@ -77,13 +77,13 @@ int sclbl_socket_create_listener( const char *socket_path ) {
 
     // Bind to socket
     if ( bind( socket_fd, (struct sockaddr *) &addr, sizeof( struct sockaddr_un ) ) == -1 ) {
-        fprintf( stderr, "Error: Sender socket bind error.\n" );
+        printf("Error: Sender socket bind error.\n" );
         return -1;
     }
 
     // Start listening on socket
     if ( listen( socket_fd, 30 ) == -1 ) {
-        fprintf( stderr, "Error: Sender socket listen error.\n" );
+        printf("Error: Sender socket listen error.\n" );
         return -1;
     }
 
@@ -115,7 +115,7 @@ void sclbl_socket_receive_on_connection( int connection_fd, size_t *allocated_bu
         // Incoming message is larger than allocated buffer. Reallocate.
         char *new_pointer = realloc( ( *message_input_buffer ), ( *message_length ) * sizeof( char ) );
         if ( new_pointer == NULL ) {
-            fprintf( stderr, "Error: Could not allocate buffer with length: %d. Ignoring message.\n", ( *message_length ) );
+            printf("Error: Could not allocate buffer with length: %d. Ignoring message.\n", ( *message_length ) );
             return;
         }
         // Reallocation succesful
@@ -134,7 +134,7 @@ void sclbl_socket_receive_on_connection( int connection_fd, size_t *allocated_bu
         }
     }
     if ( num_read == -1 ) {
-        fprintf( stderr, "Warning: Error when receiving socket message!\n" );
+        printf("Warning: Error when receiving socket message!\n" );
     }
 }
 
@@ -157,7 +157,7 @@ void sclbl_socket_start_listener( const char *socket_path, void ( *callback_func
     // Create socket
     int socket_fd = sclbl_socket_create_listener( socket_path );
     if ( socket_fd == -1 ) {
-        fprintf( stderr, "Error: Failed to create listening socket.\n" );
+        printf("Error: Failed to create listening socket.\n" );
         return;
     }
 
@@ -183,7 +183,7 @@ void sclbl_socket_start_listener( const char *socket_path, void ( *callback_func
 
         // Close connection
         if ( close( connection_fd ) == -1 ) {
-            fprintf( stderr, "Warning: Sender socket close error!\n" );
+            printf("Warning: Sender socket close error!\n" );
         }
     }
     free( message_input_buffer );
@@ -193,7 +193,7 @@ int32_t sclbl_socket_connect( const char *socket_path ) {
     // Create new socket
     int32_t socket_fd = socket( AF_UNIX, SOCK_STREAM, 0 );
     if ( socket_fd < 0 ) {
-        fprintf( stderr, "Warning: socket() creation failed\n" );
+        printf("Warning: socket() creation failed\n" );
         close( socket_fd );
         return -1;
     }
@@ -209,7 +209,7 @@ int32_t sclbl_socket_connect( const char *socket_path ) {
 
     // Check if we have access to socket
     if ( access( socket_path, F_OK ) != 0 ) {
-        fprintf( stderr, "Warning: access to socket failed at %s\n", socket_path );
+        printf("Warning: access to socket failed at %s\n", socket_path );
         close( socket_fd );
         return -1;
     }
@@ -218,7 +218,7 @@ int32_t sclbl_socket_connect( const char *socket_path ) {
     if ( connect( socket_fd, (struct sockaddr *) &addr,
                   sizeof( struct sockaddr_un ) )
          == -1 ) {
-        fprintf( stderr, "Warning: connect to socket failed\n" );
+        printf("Warning: connect to socket failed\n" );
         close( socket_fd );
         return -1;
     }
@@ -248,13 +248,13 @@ bool sclbl_socket_send_to_connection( const int connection_fd, const char *messa
     for ( ssize_t sent_now = 0; header_sent_total < sizeof( message_length ); header_sent_total += (size_t) sent_now ) {
         sent_now = send( connection_fd, ( (char *) &message_length ) + header_sent_total, sizeof( message_length ) - header_sent_total, flags );
         if ( sent_now == -1 ) {
-            fprintf( stderr, "Warning: send to socket failed\n" );
+            printf("Warning: send to socket failed\n" );
             return false;
         }
     }
 
     if ( header_sent_total != sizeof( message_length ) ) {
-        fprintf( stderr, "Warning: Could not send header!\n" );
+        printf("Warning: Could not send header!\n" );
         return false;
     }
 
@@ -264,7 +264,7 @@ bool sclbl_socket_send_to_connection( const int connection_fd, const char *messa
         sent_now = send( connection_fd, ( (char *) message_to_send ) + sent_total,
                          message_length - sent_total, flags );
         if ( sent_now == -1 ) {
-            fprintf( stderr, "Warning: send to socket failed\n" );
+            printf("Warning: send to socket failed\n" );
             return false;
         }
     }
