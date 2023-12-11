@@ -67,3 +67,7 @@ void *sclbl_shm_read( int shm_id, size_t *data_length, char **payload_data );
  * @param memory_address A pointer to the shared memory.
  */
 void sclbl_shm_close( void *memory_address );
+
+int sclbl_shm_destroy( int shm_id );
+
+int sclbl_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size );
