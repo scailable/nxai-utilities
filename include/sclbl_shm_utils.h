@@ -41,3 +41,29 @@ key_t sclbl_shm_create( char *path, int project_id, size_t size, int *shm_id );
  * @note This function does not check if the shared memory segment is large enough to hold the data. It is the responsibility of the caller to ensure this.
  */
 void sclbl_shm_write( int shm_id, char *data, uint32_t size );
+
+/**
+ * @brief Reads data from shared memory.
+ *
+ * This function reads data from shared memory and returns a pointer to the shared memory block.
+ * The first 4 bytes of the shared memory is always the size of the tensor.
+ * The payload returned is a pointer to the shared memory block after the size header.
+ * This process attaches the shared memory block to this process and keeps it attached.
+ * Call `sclbl_shm_close` when this memory is no longer in use.
+ *
+ * @param shm_id The shared memory ID.
+ * @param data_length A pointer to a size_t variable where the function will store the size of the tensor.
+ * @param payload_data A pointer to a char pointer where the function will store the pointer to the payload data.
+ *
+ * @return A pointer to the shared memory data.
+ */
+void *sclbl_shm_read( int shm_id, size_t *data_length, char **payload_data );
+
+/**
+ * @brief Detaches shared memory from the current process.
+ *
+ * This function detaches the shared memory from the current process.
+ *
+ * @param memory_address A pointer to the shared memory.
+ */
+void sclbl_shm_close( void *memory_address );
