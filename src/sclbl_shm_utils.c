@@ -64,17 +64,17 @@ void sclbl_shm_close( void *memory_address ) {
 }
 
 int sclbl_shm_destroy( int shm_id ) {
-    return shmctl(shm_id, IPC_RMID, NULL);
+    return shmctl( shm_id, IPC_RMID, NULL );
 }
 
-int sclbl_shm_realloc( key_t shm_key, int old_shm_id , size_t new_size ) {
+int sclbl_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size ) {
 
     // Remove old SHM
-    if (sclbl_shm_destroy(old_shm_id) != 0) {
+    if ( sclbl_shm_destroy( old_shm_id ) != 0 ) {
         return -1;
     }
 
-    int new_shm_id = shmget(shm_key, new_size, 0666 | IPC_CREAT);
-    
+    int new_shm_id = shmget( shm_key, new_size, 0666 | IPC_CREAT );
+
     return new_shm_id;
 }

@@ -68,6 +68,30 @@ void *sclbl_shm_read( int shm_id, size_t *data_length, char **payload_data );
  */
 void sclbl_shm_close( void *memory_address );
 
+/**
+ * @brief Destroys a shared memory segment.
+ *
+ * This function destroys a shared memory segment identified by shm_id.
+ * It uses the shmctl system call with the IPC_RMID command to remove the shared memory segment.
+ *
+ * @param shm_id The identifier of the shared memory segment to be destroyed.
+ *
+ * @return The return value of the shmctl system call.
+ *
+ * @see shmctl
+ */
 int sclbl_shm_destroy( int shm_id );
 
+/**
+ * \brief Reallocates shared memory.
+ *
+ * This function first destroys the old shared memory identified by `old_shm_id`, then creates a new shared memory with the given `shm_key` and `new_size`.
+ * If the old shared memory cannot be destroyed, the function returns -1. Otherwise, it returns the identifier of the new shared memory.
+ *
+ * \param shm_key The key of the shared memory to be reallocated.
+ * \param old_shm_id The identifier of the old shared memory to be destroyed.
+ * \param new_size The size of the new shared memory to be created.
+ *
+ * \return The identifier of the new shared memory if successful, -1 if the old shared memory cannot be destroyed.
+ */
 int sclbl_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size );
