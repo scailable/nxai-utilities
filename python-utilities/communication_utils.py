@@ -86,7 +86,7 @@ def startUnixSocketServer(
     return server
 
 
-def receiveMessageOverConnection(connection) -> str:
+def receiveMessageOverConnection(connection) -> bytes:
     """
     Receives a message over a network connection.
 
@@ -112,11 +112,10 @@ def receiveMessageOverConnection(connection) -> str:
         if not data:
             break
 
-    decoded = data.decode("utf-8")
-    return decoded
+    return data
 
 
-def waitForSocketMessage(server: socket.socket, timeout=10) -> (str, socket.socket):
+def waitForSocketMessage(server: socket.socket, timeout=10) -> (bytes, socket.socket):
     """
     This function waits for a message to be received on a socket server.
 
@@ -136,12 +135,12 @@ def waitForSocketMessage(server: socket.socket, timeout=10) -> (str, socket.sock
     connection, _ = server.accept()
     connection.settimeout(timeout)  # timeout for receiving data
     # Receive the message
-    decoded = receiveMessageOverConnection(connection)
+    data = receiveMessageOverConnection(connection)
 
-    return decoded, connection
+    return data, connection
 
 
-def sendMessageOverConnection(connection: socket.socket, message: str):
+def sendMessageOverConnection(connection: socket.socket, message: bytes):
     """
     Sends a message over a socket connection.
 
@@ -166,17 +165,14 @@ def sendMessageOverConnection(connection: socket.socket, message: str):
     >>> sendMessageOverConnection(connection, "Hello, World!")
     """
 
-    # Convert the message to bytes
-    message_bytes = bytes(message, "utf-8")
-
     # Calculate the length of the message
-    message_length = struct.pack("<I", len(message_bytes))
+    message_length = struct.pack("<I", len(message))
 
     # Send the length of the message over the connection
     connection.sendall(message_length)
 
     # Send the message over the connection
-    connection.sendall(message_bytes)
+    connection.sendall(message)
 
 
 def sendSocketMessage(
