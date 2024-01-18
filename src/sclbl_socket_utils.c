@@ -24,32 +24,28 @@ bool sclbl_socket_interrupt_signal = false;
 // Create timeout structure for socket connections
 static struct timeval tv = { .tv_sec = 5, .tv_usec = 0 };
 
-// TODO: Add functionality to reuse buffer for return message #3
-char *sclbl_socket_send_receive_message( const char *socket_path, const char *message_to_send, const uint32_t sending_message_length, uint32_t *return_message_length ) {
+uint32_t sclbl_socket_send_receive_message( const char *socket_path, const char *message_to_send, const uint32_t sending_message_length, char **return_message_buffer, size_t *allocated_message_length ) {
     // Create new socket
     int32_t connection_fd = sclbl_socket_connect( socket_path );
     if ( connection_fd == -1 ) {
-        return NULL;
+        return 0;
     }
 
     // Send message to connection
     bool send_success = sclbl_socket_send_to_connection( connection_fd, message_to_send, sending_message_length );
     if ( send_success == false ) {
         close( connection_fd );
-        return NULL;
+        return 0;
     }
 
     // Receive response on connection
-    size_t allocated_message_length = 0;
-    char *received_message = NULL;
     uint32_t received_message_length;
-    sclbl_socket_receive_on_connection( connection_fd, &allocated_message_length, &received_message, &received_message_length );
+    sclbl_socket_receive_on_connection( connection_fd, allocated_message_length, return_message_buffer, &received_message_length );
 
     // Close socket connection
     close( connection_fd );
 
-    *return_message_length = received_message_length;
-    return received_message;
+    return received_message_length;
 }
 
 int sclbl_socket_create_listener( const char *socket_path ) {
