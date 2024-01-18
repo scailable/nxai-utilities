@@ -112,22 +112,19 @@ int32_t sclbl_socket_connect( const char *socket_path );
 void sclbl_socket_send( const char *socket_path, const char *string_to_send, uint32_t message_length );
 
 /**
- * \brief Send a message to a socket and receive a response.
- *
- * This function creates a new socket, sets the socket options, and connects to the socket at the given path.
- * It then sends a message header and the actual message to the socket.
- * After sending, it reads a message header from the socket to get the length of the incoming message,
- * allocates the necessary space for the incoming message, and receives the message.
- * If any step fails, the function cleans up and returns NULL.
- *
- * \param socket_path The file system path to the socket.
- * \param message_to_send The message to send to the socket.
- * \param output_message_length The length of the message to send.
- * \param return_message_length The length of the message returned.
- *
- * \return A pointer to the received message, or NULL if any step fails.
+ * @brief Sends a message through a socket and receives a response.
+ * 
+ * This function connects to a socket, sends a message, receives a response, 
+ * and then closes the connection. It returns the length of the received message.
+ * 
+ * @param socket_path Path to the socket.
+ * @param message_to_send Message to send through the socket.
+ * @param sending_message_length Length of the message to send.
+ * @param return_message_buffer Pointer to buffer that will hold the received message. Can be NULL or a reusable buffer.
+ * @param allocated_message_length Pointer to how much space in the existing buffer is allocated. If too small, or `return_message_buffer` is NULL, `return_message_buffer` will be reallocated and this variable updated.
+ * @return Returns the length of the received message or 0 if there was an error.
  */
-char *sclbl_socket_send_receive_message( const char *socket_path, const char *string_to_send, const uint32_t output_message_length, uint32_t *return_message_length );
+uint32_t sclbl_socket_send_receive_message( const char *socket_path, const char *message_to_send, const uint32_t sending_message_length, char **return_message_buffer, size_t *allocated_message_length );
 
 /**
  * @brief Sends a message to a socket
