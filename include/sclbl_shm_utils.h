@@ -5,13 +5,98 @@ extern "C" {
 #endif
 
 #include <stdbool.h>
-#include <stddef.h>
+#include <sys/types.h>
 #include <stdint.h>
-#include <sys/shm.h>
 
 #ifdef __cplusplus
 }
 #endif
+
+/**
+ * @brief Creates a named pipe.
+ *
+ * This function first attempts to remove any existing pipe with the same name. Then, it creates a new pipe with the given name.
+ * If the pipe creation fails, the function returns false. Otherwise, it returns true.
+ *
+ * @param name The name of the pipe to create.
+ * @return Returns true if the pipe is successfully created, otherwise false.
+ */
+bool sclbl_create_pipe( const char *name );
+
+/**
+ * @brief Opens a named pipe for writing.
+ *
+ * This function opens the named pipe for writing. If the opening fails, it returns -1. Otherwise, it returns the file descriptor.
+ *
+ * @param name The name of the pipe to open.
+ * @return Returns the file descriptor if the pipe is successfully opened, otherwise -1.
+ */
+int sclbl_open_pipe_writing( const char *name );
+
+/**
+ * @brief Opens a named pipe for reading.
+ *
+ * This function opens the named pipe for reading. If the opening fails, it returns -1. Otherwise, it returns the file descriptor.
+ *
+ * @param name The name of the pipe to open.
+ * @return Returns the file descriptor if the pipe is successfully opened, otherwise -1.
+ */
+int sclbl_open_pipe_reading( const char *name );
+
+/**
+ * @brief Reads a single character from a pipe.
+ *
+ * This function reads a single character from the pipe associated with the provided file descriptor.
+ * If the reading fails, it returns -1. Otherwise, it returns the character read.
+ *
+ * @param fd The file descriptor of the pipe.
+ * @return Returns the character read from the pipe, or -1 if an error occurred.
+ */
+char sclbl_pipe_read( int fd );
+
+/**
+ * @brief Reads a single character from a pipe with a timeout.
+ *
+ * This function reads a single character from the pipe associated with the provided file descriptor within the specified timeout period.
+ * If the reading fails, it returns -1. If the timeout expires without data available, it returns 0. Otherwise, it returns the character read.
+ *
+ * @param fd The file descriptor of the pipe.
+ * @param timeout The timeout period in seconds.
+ * @return Returns the character read from the pipe, -1 if an error occurred, or 0 if the timeout expired without data available.
+ */
+char sclbl_pipe_timed_read( int fd, int timeout );
+
+/**
+ * @brief Closes a named pipe.
+ *
+ * This function closes the named pipe associated with the provided file descriptor.
+ * If the closing fails, it prints an error message.
+ *
+ * @param fd The file descriptor of the pipe to close.
+ */
+void sclbl_pipe_close( int semaphore );
+
+/**
+ * @brief Sends a single character through a pipe.
+ *
+ * This function writes a single character to the pipe associated with the provided file descriptor.
+ *
+ * @param fd The file descriptor of the pipe.
+ * @param signal The character to send through the pipe.
+ * @return Returns the number of characters written, or -1 if an error occurred.
+ */
+ssize_t sclbl_pipe_send( int fd, char signal );
+
+/**
+ * @brief Retrieves a shared memory segment.
+ *
+ * This function retrieves a shared memory segment with a given key.
+ * If the retrieval fails, it prints an error message.
+ *
+ * @param shm_key The key of the shared memory segment.
+ * @return The id of the shared memory segment.
+ */
+int sclbl_shm_get( key_t shm_key );
 
 /**
  * @brief Creates a shared memory segment.
@@ -40,7 +125,7 @@ key_t sclbl_shm_create( char *path, int project_id, size_t size, int *shm_id );
  *
  * @note This function does not check if the shared memory segment is large enough to hold the data. It is the responsibility of the caller to ensure this.
  */
-void sclbl_shm_write( int shm_id, char *data, uint32_t size );
+bool sclbl_shm_write( int shm_id, char *data, uint32_t size );
 
 /**
  * @brief Reads data from shared memory.
@@ -95,3 +180,14 @@ int sclbl_shm_destroy( int shm_id );
  * \return The identifier of the new shared memory if successful, -1 if the old shared memory cannot be destroyed.
  */
 int sclbl_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size );
+
+/**
+ * @brief Get the size of shared memory segment
+ *
+ * This function retrieves the size of a shared memory segment identified by shm_id.
+ * It subtracts HEADER_BYTES from the total size of the shared memory segment.
+ *
+ * @param shm_id Identifier of the shared memory segment
+ * @return Size of the shared memory segment minus HEADER_BYTES
+ */
+size_t sclbl_shm_get_size( int shm_id );
