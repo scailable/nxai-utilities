@@ -28,7 +28,8 @@ bool sclbl_create_pipe( const char *name ) {
     // First unlink in case it exists
     unlink( name );
     // Create new pipe
-    if ( mkfifo( name, 0666 ) == -1 ) {
+    if ( mkfifo( name, 0600 ) == -1 ) {
+        printf( "Could not create pipe: %s\n", strerror( errno ) );
         return false;
     }
     return true;
