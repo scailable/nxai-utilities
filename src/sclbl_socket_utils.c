@@ -10,8 +10,6 @@
 #include <unistd.h>
 
 // Socket stuff
-#include <netinet/in.h>
-#include <signal.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -214,7 +212,7 @@ int32_t sclbl_socket_connect( const char *socket_path ) {
     if ( connect( socket_fd, (struct sockaddr *) &addr,
                   sizeof( struct sockaddr_un ) )
          == -1 ) {
-        printf( "Warning: connect to socket failed\n" );
+        printf( "Warning: connect to socket [%s] failed: %s\n",socket_path, strerror( errno ) );
         close( socket_fd );
         return -1;
     }
