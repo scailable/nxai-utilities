@@ -5,6 +5,7 @@ import socket
 import time
 import json
 import sysv_ipc as ipc
+import msgpack
 
 
 def patchSettings(
@@ -334,3 +335,32 @@ def read_shm(shm_key: int) -> bytes:
     shm.detach()
     # Return the raw data read from memory
     return buf
+
+
+def parseInferenceResults(message: bytes) -> dict:
+    parsed_response = msgpack.unpackb(message)
+    if "BBoxes_xyxy" in parsed_response:
+        for key, value in parsed_response["BBoxes_xyxy"].items():
+            parsed_response["BBoxes_xyxy"][key] = list(
+                struct.unpack("f" * int(len(value) / 4), value)
+            )
+    if "Identity" in parsed_response:
+        parsed_response["Identity"] = list(
+            struct.unpack(
+                "f" * int(len(parsed_response["Identity"]) / 4),
+                parsed_response["Identity"],
+            )
+        )
+    return parsed_response
+
+
+def writeInferenceResults(object: dict) -> bytes:
+    if "BBoxes_xyxy" in object:
+        for key, value in object["BBoxes_xyxy"].items():
+            object["BBoxes_xyxy"][key] = struct.pack("f" * len(value), *value)
+    if "Identity" in object:
+        object["Identity"] = struct.pack(
+            "f" * len(object["Identity"]), object["Identity"]
+        )
+    message_bytes = msgpack.packb(object)
+    return message_bytes
