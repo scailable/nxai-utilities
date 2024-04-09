@@ -75,6 +75,9 @@ int sclbl_socket_create_listener( const char *socket_path ) {
         return -1;
     }
 
+    // Set the socket file permissions to open
+    chmod(socket_path, 0777);
+
     // Start listening on socket
     if ( listen( socket_fd, 30 ) == -1 ) {
         printf( "Error: Sender socket listen error.\n" );
@@ -181,6 +184,9 @@ void sclbl_socket_start_listener( const char *socket_path, void ( *callback_func
         }
     }
     free( message_input_buffer );
+
+    // Unlink socket file so it can be used again
+    unlink(socket_path);
 }
 
 int32_t sclbl_socket_connect( const char *socket_path ) {
