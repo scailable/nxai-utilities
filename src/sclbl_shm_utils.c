@@ -96,7 +96,10 @@ void sclbl_pipe_close( int fd ) {
 
 key_t sclbl_shm_create( char *path, int project_id, size_t size, int *shm_id ) {
     key_t shm_key = ftok( path, project_id );
-    *shm_id = shmget( shm_key, size + HEADER_BYTES, 0600 | IPC_CREAT );
+    *shm_id = shmget( shm_key, size + HEADER_BYTES, 0666 | IPC_CREAT );
+    if (*shm_id == -1) {
+        perror("Failed to create SHM:");
+    }
     return shm_key;
 }
 
@@ -168,7 +171,7 @@ int sclbl_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size ) {
         return -1;
     }
 
-    int new_shm_id = shmget( shm_key, new_size + HEADER_BYTES, 0600 | IPC_CREAT );
+    int new_shm_id = shmget( shm_key, new_size + HEADER_BYTES, 0666 | IPC_CREAT );
 
     return new_shm_id;
 }
