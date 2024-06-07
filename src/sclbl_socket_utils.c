@@ -20,7 +20,7 @@ const uint8_t MESSAGE_HEADER_LENGTH = 4;
 bool sclbl_socket_interrupt_signal = false;
 
 // Create timeout structure for socket connections
-static struct timeval tv = { .tv_sec = 5, .tv_usec = 0 };
+static struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
 
 uint32_t sclbl_socket_send_receive_message( const char *socket_path, const char *message_to_send, const uint32_t sending_message_length, char **return_message_buffer, size_t *allocated_message_length ) {
     // Create new socket
