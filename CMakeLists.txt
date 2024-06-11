@@ -9,4 +9,5 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_library(sclbl-c-utilities
     ${CMAKE_CURRENT_SOURCE_DIR}/src/sclbl_socket_utils.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/sclbl_shm_utils.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/nxai_process_utils.c
 )
