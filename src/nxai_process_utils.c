@@ -18,9 +18,9 @@
 char *_start_log_filepath = NULL;
 char *_rotating_log_filepath = NULL;
 char *_log_prefix = NULL;
-uint64_t last_timestamp = 0;
+static uint64_t last_timestamp = 0;
 size_t logfile_max_size_mb = 1;
-bool start_logfile_full = false;
+static bool start_logfile_full = false;
 
 uint64_t nxai_current_timestamp_ms() {
     struct timeval te;
@@ -46,11 +46,13 @@ void nxai_initialise_logging( const char *start_log_filepath, const char *rotati
         printf( "Failed to initialise logfile: %s\n", _start_log_filepath );
     }
     fclose( logfile );
+    chmod( _start_log_filepath, 0666 );
     logfile = fopen( _rotating_log_filepath, "w" );
     if ( logfile == NULL ) {
         printf( "Failed to initialise logfile: %s\n", _rotating_log_filepath );
     }
     fclose( logfile );
+    chmod( _rotating_log_filepath, 0666 );
 }
 
 void nxai_finalise_logging() {
