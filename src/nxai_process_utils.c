@@ -36,13 +36,13 @@ uint64_t nxai_current_timestamp_us() {
     return microseconds;
 }
 
-void initialise_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix ) {
+void nxai_initialise_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix ) {
     _start_log_filepath = strdup( start_log_filepath );
     _rotating_log_filepath = strdup( rotating_log_filepath );
     _log_prefix = strdup( log_prefix );
 }
 
-void finalise_logging() {
+void nxai_finalise_logging() {
     free( _start_log_filepath );
     free( _rotating_log_filepath );
     free( _log_prefix );

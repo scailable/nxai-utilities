@@ -6,7 +6,9 @@
 extern "C" {
 #endif
 
-void initialise_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix );
+void nxai_initialise_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix );
+
+void nxai_finalise_logging();
 
 void nxai_vlog( const char *fmt, ... );
 
