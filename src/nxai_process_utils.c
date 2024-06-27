@@ -19,7 +19,7 @@ char *_start_log_filepath = NULL;
 char *_rotating_log_filepath = NULL;
 char *_log_prefix = NULL;
 uint64_t last_timestamp = 0;
-size_t logfile_max_size_mb = 10;
+size_t logfile_max_size_mb = 1;
 bool start_logfile_full = false;
 
 uint64_t nxai_current_timestamp_ms() {
@@ -40,6 +40,17 @@ void nxai_initialise_logging( const char *start_log_filepath, const char *rotati
     _start_log_filepath = strdup( start_log_filepath );
     _rotating_log_filepath = strdup( rotating_log_filepath );
     _log_prefix = strdup( log_prefix );
+    // Create and clear log files
+    FILE *logfile = fopen( _start_log_filepath, "w" );
+    if ( logfile == NULL ) {
+        printf( "Failed to initialise logfile: %s\n", _start_log_filepath );
+    }
+    fclose( logfile );
+    logfile = fopen( _rotating_log_filepath, "w" );
+    if ( logfile == NULL ) {
+        printf( "Failed to initialise logfile: %s\n", _rotating_log_filepath );
+    }
+    fclose( logfile );
 }
 
 void nxai_finalise_logging() {
