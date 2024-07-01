@@ -104,12 +104,13 @@ void nxai_vlog( const char *fmt, ... ) {
                     break;
                 case EACCES:// Permission denied
                     printf( "Permission denied trying to open logfile: %s.\n", _start_log_filepath );
+                    break;
                 default:
                     printf( "An unexpected error occurred accessing log file: %s %s\n", _start_log_filepath, strerror( errno ) );
                     break;
             }
         } else {
-            off_t file_size = file_stat.st_size;
+            size_t file_size = file_stat.st_size;
             if ( file_size < logfile_max_size_mb * 1000000 ) {
                 // Write to start_log
                 flogfile = fopen( _start_log_filepath, "a" );
@@ -133,12 +134,13 @@ void nxai_vlog( const char *fmt, ... ) {
                     break;
                 case EACCES:// Permission denied
                     printf( "Permission denied trying to open logfile: %s.\n", _rotating_log_filepath );
+                    break;
                 default:
                     printf( "An unexpected error occurred accessing log file: %s %s\n", _rotating_log_filepath, strerror( errno ) );
                     break;
             }
         } else {
-            off_t file_size = file_stat.st_size;
+            size_t file_size = file_stat.st_size;
             if ( file_size > logfile_max_size_mb * 1000000 ) {
                 // Rotating logfile is full, rename to ".old"
                 size_t new_filepath_length = strlen( _rotating_log_filepath ) + 4 + 1;
@@ -158,21 +160,15 @@ void nxai_vlog( const char *fmt, ... ) {
     }
 
     // Write to logfile
-    fprintf( flogfile, "%s%ld %09lld: ", _log_prefix, timestamp, (long long) duration );
+    fprintf( flogfile, "%s%ld %09lld: ", _log_prefix, timestamp / 1000, (long long) duration );
     va_start( ap, fmt );
     vfprintf( flogfile, fmt, ap );
     va_end( ap );
     fclose( flogfile );
 }
 
-pid_t nxai_start_process( char *const argv[], const char *output_filepath, int *output_fd ) {
+pid_t nxai_start_process( char *const argv[] ) {
     pid_t child_pid;
-    *output_fd = open( output_filepath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
-    if ( *output_fd == -1 ) {
-        printf( "Warning: Could not open log filepath for process: %s\n", output_filepath );
-        perror( "open" );
-        exit( EXIT_FAILURE );
-    }
 
     char *envp[] = { NULL };
 
@@ -180,8 +176,6 @@ pid_t nxai_start_process( char *const argv[], const char *output_filepath, int *
     posix_spawn_file_actions_t file_actions;
     posix_spawnattr_t attrp;
     posix_spawn_file_actions_init( &file_actions );
-    posix_spawn_file_actions_adddup2( &file_actions, *output_fd, STDOUT_FILENO );
-    posix_spawn_file_actions_adddup2( &file_actions, *output_fd, STDERR_FILENO );
     posix_spawnattr_init( &attrp );
 
     // Spawn a new process

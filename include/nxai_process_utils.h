@@ -12,7 +12,7 @@ void nxai_finalise_logging();
 
 void nxai_vlog( const char *fmt, ... );
 
-pid_t nxai_start_process( char *const argv[], const char *output_filepath, int *output_fd );
+pid_t nxai_start_process( char *const argv[] );
 
 #ifdef __cplusplus
 }
