@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 
 #ifdef __MUSL__
 // musl crosscompiler doesn't find time.h otherwise
@@ -21,6 +22,7 @@
 #include <fcntl.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
+#include <sys/select.h>
 
 #define HEADER_BYTES 4
 
@@ -36,11 +38,15 @@ bool sclbl_create_pipe( const char *name ) {
 }
 
 int sclbl_open_pipe_writing( const char *name ) {
-    int fd = open( name, O_WRONLY ); /* open as write-only */
-    if ( fd < 0 ) {
-        return -1;
+    for ( size_t index = 0; index < 20; index++ ) {
+        int fd = open( name, O_WRONLY | O_NONBLOCK );// Open as write-only
+        if ( fd < 0 ) {
+            sleep( 1 );
+        } else {
+            return fd;
+        }
     }
-    return fd;
+    return -1;
 }
 
 int sclbl_open_pipe_reading( const char *name ) {
