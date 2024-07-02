@@ -1,10 +1,16 @@
 #pragma once
-#include <spawn.h>
-#include <stdarg.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include <spawn.h>
+#include <stdarg.h>
+#include <stdint.h>
+
+uint64_t nxai_current_timestamp_ms();
+
+uint64_t nxai_current_timestamp_us();
 
 void nxai_initialise_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix );
 
