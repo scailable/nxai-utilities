@@ -1,12 +1,12 @@
-#include "sclbl_shm_utils.h"
+#include "nxai_shm_utils.h"
 
 #include <errno.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <signal.h>
 
 #ifdef __MUSL__
 // musl crosscompiler doesn't find time.h otherwise
@@ -20,13 +20,13 @@
 
 // SHM stuff
 #include <fcntl.h>
+#include <sys/select.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
-#include <sys/select.h>
 
 #define HEADER_BYTES 4
 
-bool sclbl_create_pipe( const char *name ) {
+bool nxai_create_pipe( const char *name ) {
     // First unlink in case it exists
     unlink( name );
     // Create new pipe
@@ -37,7 +37,7 @@ bool sclbl_create_pipe( const char *name ) {
     return true;
 }
 
-int sclbl_open_pipe_writing( const char *name ) {
+int nxai_open_pipe_writing( const char *name ) {
     for ( size_t index = 0; index < 20; index++ ) {
         int fd = open( name, O_WRONLY | O_NONBLOCK );// Open as write-only
         if ( fd < 0 ) {
@@ -49,7 +49,7 @@ int sclbl_open_pipe_writing( const char *name ) {
     return -1;
 }
 
-int sclbl_open_pipe_reading( const char *name ) {
+int nxai_open_pipe_reading( const char *name ) {
     int fd = open( name, O_RDONLY );
     if ( fd < 0 ) {
         return -1;
@@ -57,11 +57,11 @@ int sclbl_open_pipe_reading( const char *name ) {
     return fd;
 }
 
-ssize_t sclbl_pipe_send( int fd, char signal ) {
+ssize_t nxai_pipe_send( int fd, char signal ) {
     return write( fd, &signal, 1 );
 }
 
-char sclbl_pipe_read( int fd ) {
+char nxai_pipe_read( int fd ) {
     // Read from FIFO
     char response;
     ssize_t bytes_read = read( fd, &response, 1 );
@@ -71,7 +71,7 @@ char sclbl_pipe_read( int fd ) {
     return response;
 }
 
-char sclbl_pipe_timed_read( int fd, int timeout ) {
+char nxai_pipe_timed_read( int fd, int timeout ) {
     fd_set set;
     struct timeval tv;
     int rv;
@@ -94,22 +94,22 @@ char sclbl_pipe_timed_read( int fd, int timeout ) {
     return buff[0];
 }
 
-void sclbl_pipe_close( int fd ) {
+void nxai_pipe_close( int fd ) {
     if ( close( fd ) == -1 ) {
         printf( "Could not close pipe: %s\n", strerror( errno ) );
     }
 }
 
-key_t sclbl_shm_create( char *path, int project_id, size_t size, int *shm_id ) {
+key_t nxai_shm_create( char *path, int project_id, size_t size, int *shm_id ) {
     key_t shm_key = ftok( path, project_id );
     *shm_id = shmget( shm_key, size + HEADER_BYTES, 0666 | IPC_CREAT );
-    if (*shm_id == -1) {
-        perror("Failed to create SHM:");
+    if ( *shm_id == -1 ) {
+        perror( "Failed to create SHM:" );
     }
     return shm_key;
 }
 
-int sclbl_shm_get( key_t shm_key ) {
+int nxai_shm_get( key_t shm_key ) {
     int shm_id = shmget( shm_key, 0, 0 );
     if ( shm_id == -1 ) {
         printf( "Could not get SHM %d : %s\n", __LINE__, strerror( errno ) );
@@ -117,7 +117,7 @@ int sclbl_shm_get( key_t shm_key ) {
     return shm_id;
 }
 
-bool sclbl_shm_write( int shm_id, char *data, uint32_t size ) {
+bool nxai_shm_write( int shm_id, char *data, uint32_t size ) {
     // Attach the shared memory segment to the process's address space.
     // This is done by calling the shmat() function with the shared memory ID.
     // The function returns a pointer to the attached shared memory segment.
@@ -146,7 +146,7 @@ bool sclbl_shm_write( int shm_id, char *data, uint32_t size ) {
     return true;
 }
 
-void *sclbl_shm_read( int shm_id, size_t *data_length, char **payload_data ) {
+void *nxai_shm_read( int shm_id, size_t *data_length, char **payload_data ) {
     void *shared_data = shmat( shm_id, NULL, 0 );
     if ( shared_data == (void *) -1 ) {
         return NULL;
@@ -161,19 +161,19 @@ void *sclbl_shm_read( int shm_id, size_t *data_length, char **payload_data ) {
     return shared_data;
 }
 
-void sclbl_shm_close( void *memory_address ) {
+void nxai_shm_close( void *memory_address ) {
     // Detach memory from this process
     shmdt( memory_address );
 }
 
-int sclbl_shm_destroy( int shm_id ) {
+int nxai_shm_destroy( int shm_id ) {
     return shmctl( shm_id, IPC_RMID, NULL );
 }
 
-int sclbl_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size ) {
+int nxai_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size ) {
 
     // Remove old SHM
-    if ( sclbl_shm_destroy( old_shm_id ) != 0 ) {
+    if ( nxai_shm_destroy( old_shm_id ) != 0 ) {
         return -1;
     }
 
@@ -182,7 +182,7 @@ int sclbl_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size ) {
     return new_shm_id;
 }
 
-size_t sclbl_shm_get_size( int shm_id ) {
+size_t nxai_shm_get_size( int shm_id ) {
     struct shmid_ds buf;
     shmctl( shm_id, IPC_STAT, &buf );
     return buf.shm_segsz - HEADER_BYTES;

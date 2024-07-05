@@ -5,8 +5,8 @@ extern "C" {
 #endif
 
 #include <stdbool.h>
-#include <sys/types.h>
 #include <stdint.h>
+#include <sys/types.h>
 
 #ifdef __cplusplus
 }
@@ -21,7 +21,7 @@ extern "C" {
  * @param name The name of the pipe to create.
  * @return Returns true if the pipe is successfully created, otherwise false.
  */
-bool sclbl_create_pipe( const char *name );
+bool nxai_create_pipe( const char *name );
 
 /**
  * @brief Opens a named pipe for writing.
@@ -31,7 +31,7 @@ bool sclbl_create_pipe( const char *name );
  * @param name The name of the pipe to open.
  * @return Returns the file descriptor if the pipe is successfully opened, otherwise -1.
  */
-int sclbl_open_pipe_writing( const char *name );
+int nxai_open_pipe_writing( const char *name );
 
 /**
  * @brief Opens a named pipe for reading.
@@ -41,7 +41,7 @@ int sclbl_open_pipe_writing( const char *name );
  * @param name The name of the pipe to open.
  * @return Returns the file descriptor if the pipe is successfully opened, otherwise -1.
  */
-int sclbl_open_pipe_reading( const char *name );
+int nxai_open_pipe_reading( const char *name );
 
 /**
  * @brief Reads a single character from a pipe.
@@ -52,7 +52,7 @@ int sclbl_open_pipe_reading( const char *name );
  * @param fd The file descriptor of the pipe.
  * @return Returns the character read from the pipe, or -1 if an error occurred.
  */
-char sclbl_pipe_read( int fd );
+char nxai_pipe_read( int fd );
 
 /**
  * @brief Reads a single character from a pipe with a timeout.
@@ -64,7 +64,7 @@ char sclbl_pipe_read( int fd );
  * @param timeout The timeout period in seconds.
  * @return Returns the character read from the pipe, -1 if an error occurred, or 0 if the timeout expired without data available.
  */
-char sclbl_pipe_timed_read( int fd, int timeout );
+char nxai_pipe_timed_read( int fd, int timeout );
 
 /**
  * @brief Closes a named pipe.
@@ -74,7 +74,7 @@ char sclbl_pipe_timed_read( int fd, int timeout );
  *
  * @param fd The file descriptor of the pipe to close.
  */
-void sclbl_pipe_close( int semaphore );
+void nxai_pipe_close( int semaphore );
 
 /**
  * @brief Sends a single character through a pipe.
@@ -85,7 +85,7 @@ void sclbl_pipe_close( int semaphore );
  * @param signal The character to send through the pipe.
  * @return Returns the number of characters written, or -1 if an error occurred.
  */
-ssize_t sclbl_pipe_send( int fd, char signal );
+ssize_t nxai_pipe_send( int fd, char signal );
 
 /**
  * @brief Retrieves a shared memory segment.
@@ -96,7 +96,7 @@ ssize_t sclbl_pipe_send( int fd, char signal );
  * @param shm_key The key of the shared memory segment.
  * @return The id of the shared memory segment.
  */
-int sclbl_shm_get( key_t shm_key );
+int nxai_shm_get( key_t shm_key );
 
 /**
  * @brief Creates a shared memory segment.
@@ -112,7 +112,7 @@ int sclbl_shm_get( key_t shm_key );
  *
  * @return The key used to create the shared memory segment.
  */
-key_t sclbl_shm_create( char *path, int project_id, size_t size, int *shm_id );
+key_t nxai_shm_create( char *path, int project_id, size_t size, int *shm_id );
 
 /**
  * @brief Writes data to a shared memory segment.
@@ -125,7 +125,7 @@ key_t sclbl_shm_create( char *path, int project_id, size_t size, int *shm_id );
  *
  * @note This function does not check if the shared memory segment is large enough to hold the data. It is the responsibility of the caller to ensure this.
  */
-bool sclbl_shm_write( int shm_id, char *data, uint32_t size );
+bool nxai_shm_write( int shm_id, char *data, uint32_t size );
 
 /**
  * @brief Reads data from shared memory.
@@ -134,7 +134,7 @@ bool sclbl_shm_write( int shm_id, char *data, uint32_t size );
  * The first 4 bytes of the shared memory is always the size of the tensor.
  * The payload returned is a pointer to the shared memory block after the size header.
  * This process attaches the shared memory block to this process and keeps it attached.
- * Call `sclbl_shm_close` when this memory is no longer in use.
+ * Call `nxai_shm_close` when this memory is no longer in use.
  *
  * @param shm_id The shared memory ID.
  * @param data_length A pointer to a size_t variable where the function will store the size of the tensor.
@@ -142,7 +142,7 @@ bool sclbl_shm_write( int shm_id, char *data, uint32_t size );
  *
  * @return A pointer to the shared memory data.
  */
-void *sclbl_shm_read( int shm_id, size_t *data_length, char **payload_data );
+void *nxai_shm_read( int shm_id, size_t *data_length, char **payload_data );
 
 /**
  * @brief Detaches shared memory from the current process.
@@ -151,7 +151,7 @@ void *sclbl_shm_read( int shm_id, size_t *data_length, char **payload_data );
  *
  * @param memory_address A pointer to the shared memory.
  */
-void sclbl_shm_close( void *memory_address );
+void nxai_shm_close( void *memory_address );
 
 /**
  * @brief Destroys a shared memory segment.
@@ -165,7 +165,7 @@ void sclbl_shm_close( void *memory_address );
  *
  * @see shmctl
  */
-int sclbl_shm_destroy( int shm_id );
+int nxai_shm_destroy( int shm_id );
 
 /**
  * \brief Reallocates shared memory.
@@ -179,7 +179,7 @@ int sclbl_shm_destroy( int shm_id );
  *
  * \return The identifier of the new shared memory if successful, -1 if the old shared memory cannot be destroyed.
  */
-int sclbl_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size );
+int nxai_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size );
 
 /**
  * @brief Get the size of shared memory segment
@@ -190,4 +190,4 @@ int sclbl_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size );
  * @param shm_id Identifier of the shared memory segment
  * @return Size of the shared memory segment minus HEADER_BYTES
  */
-size_t sclbl_shm_get_size( int shm_id );
+size_t nxai_shm_get_size( int shm_id );

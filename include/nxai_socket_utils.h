@@ -13,7 +13,7 @@ extern "C" {
  * By default creating a socket listener will listen for new connections in a loop.
  * By setting this variable to true, this loop will be interrupted and the socket destroyed.
  */
-extern bool sclbl_socket_interrupt_signal;
+extern bool nxai_socket_interrupt_signal;
 
 /**
  * @brief Create a UNIX socket and start listening on it.
@@ -35,7 +35,7 @@ extern bool sclbl_socket_interrupt_signal;
  * - An error occurred while binding the socket to the specified path.
  * - An error occurred while starting to listen on the socket.
  */
-int sclbl_socket_create_listener( const char *socket_path );
+int nxai_socket_create_listener( const char *socket_path );
 
 /**
  * @brief Receives a socket message on a given connection.
@@ -50,7 +50,7 @@ int sclbl_socket_create_listener( const char *socket_path );
  * @param message_input_buffer A pointer to the input buffer in which to store the received message.
  * @param message_length A pointer to a variable in which to store the length of the received message.
  */
-void sclbl_socket_receive_on_connection( int connection_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length );
+void nxai_socket_receive_on_connection( int connection_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length );
 
 /**
  * \brief Waits for an incoming socket message, reads it and saves it to the provided buffer.
@@ -73,7 +73,7 @@ void sclbl_socket_receive_on_connection( int connection_fd, size_t *allocated_bu
  * \retval connection_fd An error occurred while the message header length does not equal MESSAGE_HEADER_LENGTH 
  *                       or while reallocating the buffer.
  */
-int sclbl_socket_await_message( int socket_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length );
+int nxai_socket_await_message( int socket_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length );
 
 /**
  * @brief Creates a socket and sets it to listen for incoming connections.
@@ -87,7 +87,7 @@ int sclbl_socket_await_message( int socket_fd, size_t *allocated_buffer_size, ch
  * @return The file descriptor for the newly created socket, or -1 if an error occurred during 
  * socket creation, binding, or listening.
  */
-void sclbl_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t, int ) );
+void nxai_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t, int ) );
 
 /**
  * @brief Connects to a Unix domain socket at a given path.
@@ -101,7 +101,7 @@ void sclbl_socket_start_listener( const char *socket_path, void ( *callback_func
  * 
  * @return socket_fd on successful connection, -1 on any failure.
  */
-int32_t sclbl_socket_connect( const char *socket_path );
+int32_t nxai_socket_connect( const char *socket_path );
 
 /**
  * @brief Send a string to a socket
@@ -109,7 +109,7 @@ int32_t sclbl_socket_connect( const char *socket_path );
  * @param socket_path Path to socket
  * @param message_to_send String to send
  */
-void sclbl_socket_send( const char *socket_path, const char *string_to_send, uint32_t message_length );
+void nxai_socket_send( const char *socket_path, const char *string_to_send, uint32_t message_length );
 
 /**
  * @brief Sends a message through a socket and receives a response.
@@ -124,7 +124,7 @@ void sclbl_socket_send( const char *socket_path, const char *string_to_send, uin
  * @param allocated_message_length Pointer to how much space in the existing buffer is allocated. If too small, or `return_message_buffer` is NULL, `return_message_buffer` will be reallocated and this variable updated.
  * @return Returns the length of the received message or 0 if there was an error.
  */
-uint32_t sclbl_socket_send_receive_message( const char *socket_path, const char *message_to_send, const uint32_t sending_message_length, char **return_message_buffer, size_t *allocated_message_length );
+uint32_t nxai_socket_send_receive_message( const char *socket_path, const char *message_to_send, const uint32_t sending_message_length, char **return_message_buffer, size_t *allocated_message_length );
 
 /**
  * @brief Sends a message to a socket
@@ -139,7 +139,7 @@ uint32_t sclbl_socket_send_receive_message( const char *socket_path, const char 
  *
  * @return true if the message was successfully sent, false otherwise
  */
-bool sclbl_socket_send_to_connection( const int connection_fd, const char *message_to_send, uint32_t message_length );
+bool nxai_socket_send_to_connection( const int connection_fd, const char *message_to_send, uint32_t message_length );
 
 #ifdef __cplusplus
 }

@@ -1,4 +1,4 @@
-#include "sclbl_socket_utils.h"
+#include "nxai_socket_utils.h"
 
 #include <errno.h>
 #include <stdbool.h>
@@ -17,20 +17,20 @@
 
 const uint8_t MESSAGE_HEADER_LENGTH = 4;
 
-bool sclbl_socket_interrupt_signal = false;
+bool nxai_socket_interrupt_signal = false;
 
 // Create timeout structure for socket connections
 static struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
 
-uint32_t sclbl_socket_send_receive_message( const char *socket_path, const char *message_to_send, const uint32_t sending_message_length, char **return_message_buffer, size_t *allocated_message_length ) {
+uint32_t nxai_socket_send_receive_message( const char *socket_path, const char *message_to_send, const uint32_t sending_message_length, char **return_message_buffer, size_t *allocated_message_length ) {
     // Create new socket
-    int32_t connection_fd = sclbl_socket_connect( socket_path );
+    int32_t connection_fd = nxai_socket_connect( socket_path );
     if ( connection_fd == -1 ) {
         return 0;
     }
 
     // Send message to connection
-    bool send_success = sclbl_socket_send_to_connection( connection_fd, message_to_send, sending_message_length );
+    bool send_success = nxai_socket_send_to_connection( connection_fd, message_to_send, sending_message_length );
     if ( send_success == false ) {
         close( connection_fd );
         return 0;
@@ -38,7 +38,7 @@ uint32_t sclbl_socket_send_receive_message( const char *socket_path, const char 
 
     // Receive response on connection
     uint32_t received_message_length;
-    sclbl_socket_receive_on_connection( connection_fd, allocated_message_length, return_message_buffer, &received_message_length );
+    nxai_socket_receive_on_connection( connection_fd, allocated_message_length, return_message_buffer, &received_message_length );
 
     // Close socket connection
     close( connection_fd );
@@ -46,7 +46,7 @@ uint32_t sclbl_socket_send_receive_message( const char *socket_path, const char 
     return received_message_length;
 }
 
-int sclbl_socket_create_listener( const char *socket_path ) {
+int nxai_socket_create_listener( const char *socket_path ) {
     // Init socket to receive data
     struct sockaddr_un addr;
 
@@ -76,7 +76,7 @@ int sclbl_socket_create_listener( const char *socket_path ) {
     }
 
     // Set the socket file permissions to open
-    chmod(socket_path, 0777);
+    chmod( socket_path, 0777 );
 
     // Start listening on socket
     if ( listen( socket_fd, 30 ) == -1 ) {
@@ -93,7 +93,7 @@ int sclbl_socket_create_listener( const char *socket_path ) {
     return socket_fd;
 }
 
-void sclbl_socket_receive_on_connection( int connection_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length ) {
+void nxai_socket_receive_on_connection( int connection_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length ) {
 
     size_t num_read_cumulitive = 0;
     ssize_t num_read;
@@ -135,12 +135,12 @@ void sclbl_socket_receive_on_connection( int connection_fd, size_t *allocated_bu
     }
 }
 
-int sclbl_socket_await_message( int socket_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length ) {
+int nxai_socket_await_message( int socket_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length ) {
 
     // Wait for incoming connection
     int connection_fd = accept( socket_fd, NULL, NULL );
 
-    sclbl_socket_receive_on_connection( connection_fd, allocated_buffer_size, message_input_buffer, message_length );
+    nxai_socket_receive_on_connection( connection_fd, allocated_buffer_size, message_input_buffer, message_length );
 
     return connection_fd;
 }
@@ -149,10 +149,10 @@ int sclbl_socket_await_message( int socket_fd, size_t *allocated_buffer_size, ch
  * @brief Listen on socket for incoming messages
  *
  */
-void sclbl_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t, int ) ) {
+void nxai_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t, int ) ) {
 
     // Create socket
-    int socket_fd = sclbl_socket_create_listener( socket_path );
+    int socket_fd = nxai_socket_create_listener( socket_path );
     if ( socket_fd == -1 ) {
         printf( "Error: Failed to create listening socket.\n" );
         return;
@@ -165,16 +165,16 @@ void sclbl_socket_start_listener( const char *socket_path, void ( *callback_func
     size_t allocated_buffer_size = 0;
 
     // Listen in a loop
-    while ( sclbl_socket_interrupt_signal == 0 ) {
+    while ( nxai_socket_interrupt_signal == 0 ) {
 
-        int connection_fd = sclbl_socket_await_message( socket_fd, &allocated_buffer_size, &message_input_buffer, &message_length );
+        int connection_fd = nxai_socket_await_message( socket_fd, &allocated_buffer_size, &message_input_buffer, &message_length );
 
         if ( connection_fd == -1 ) {
             // Socket likely timed out, start waiting again ( effectively checking for interrupt signal )
             continue;
         }
 
-        if ( sclbl_socket_interrupt_signal == false ) {
+        if ( nxai_socket_interrupt_signal == false ) {
             callback_function( message_input_buffer, message_length, connection_fd );
         }
 
@@ -186,10 +186,10 @@ void sclbl_socket_start_listener( const char *socket_path, void ( *callback_func
     free( message_input_buffer );
 
     // Unlink socket file so it can be used again
-    unlink(socket_path);
+    unlink( socket_path );
 }
 
-int32_t sclbl_socket_connect( const char *socket_path ) {
+int32_t nxai_socket_connect( const char *socket_path ) {
     // Create new socket
     int32_t socket_fd = socket( AF_UNIX, SOCK_STREAM, 0 );
     if ( socket_fd < 0 ) {
@@ -218,7 +218,7 @@ int32_t sclbl_socket_connect( const char *socket_path ) {
     if ( connect( socket_fd, (struct sockaddr *) &addr,
                   sizeof( struct sockaddr_un ) )
          == -1 ) {
-        printf( "Warning: connect to socket [%s] failed: %s\n",socket_path, strerror( errno ) );
+        printf( "Warning: connect to socket [%s] failed: %s\n", socket_path, strerror( errno ) );
         close( socket_fd );
         return -1;
     }
@@ -226,18 +226,18 @@ int32_t sclbl_socket_connect( const char *socket_path ) {
     return socket_fd;
 }
 
-void sclbl_socket_send( const char *socket_path, const char *message_to_send, uint32_t message_length ) {
+void nxai_socket_send( const char *socket_path, const char *message_to_send, uint32_t message_length ) {
 
-    int32_t connection_fd = sclbl_socket_connect( socket_path );
+    int32_t connection_fd = nxai_socket_connect( socket_path );
 
     // Send message to newly created socket
-    sclbl_socket_send_to_connection( connection_fd, message_to_send, message_length );
+    nxai_socket_send_to_connection( connection_fd, message_to_send, message_length );
 
     // Close socket
     close( connection_fd );
 }
 
-bool sclbl_socket_send_to_connection( const int connection_fd, const char *message_to_send, uint32_t message_length ) {
+bool nxai_socket_send_to_connection( const int connection_fd, const char *message_to_send, uint32_t message_length ) {
 
     setsockopt( connection_fd, SOL_SOCKET, SO_SNDTIMEO, (const char *) &tv, sizeof tv );
 
