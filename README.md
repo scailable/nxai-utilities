@@ -1,14 +1,14 @@
-# sclbl-utilities
+# nxai-utilities
 
 ## Context
 
-This project serves to provide common used utility functions across multiple Scailable applications. Placing these commonly used functions in a single source library reduces code duplication, bugs and maintenance costs.
+This project serves to provide common used utility functions across multiple NXAI applications. Placing these commonly used functions in a single source library reduces code duplication, bugs and maintenance costs.
 
 The design is to have multiple libraries which can be used from multiple projects, and can be extended in the future.
 
 Currently the projects include:
 
-- Sclbl C Utilities. A C/C++ based library which can be imported in any C/C++ application to provide convenience functions as well as interface functions for the Scailable Edge AI Manager.
+- NXAI C Utilities. A C/C++ based library which can be imported in any C/C++ application to provide convenience functions as well as interface functions for the NXAI AI Manager.
 
 ## Requirements
 
@@ -34,13 +34,13 @@ Compile library:\
 To add this library to your CMake project, add the following to the `CMakeLists.txt`:
 
 ``` cmake
-# Add Scailable C Utilities library
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/path/to/sclbl-utilities)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/path/to/sclbl-utilities/include)
-target_link_libraries(<target> sclbl-c-utilities)
+# Add NXAI C Utilities library
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/path/to/nxai-utilities)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/path/to/nxai-utilities/include)
+target_link_libraries(<target> nxai-c-utilities)
 ```
 
-- `add_subdirectory` tells your project where to find the Scailable C Utilities library.
+- `add_subdirectory` tells your project where to find the NXAI C Utilities library.
 - `include_directores` tells your project where to find the header files. This allows you to call the utility functions from your source files.
 - `target_link_libraries` links the library to your target. This also ensures that the library will be built when you build your target.
 
@@ -61,10 +61,10 @@ To do this:
 1. Navigate to this project in GitLab
 2. Navigate to `Settings` -> `CI/CD`
 3. Navigate to `Token Access`
-4. Add the path to your project starting with `scailable/`
+4. Add the path to your project starting with `ai/`
 
 Your project should now be able to pull the project and use it during CI/CD jobs.
 
 ## Licence
 
-Copyright 2023, Scailable, All rights reserved.
+Copyright 2024, Network Optix, All rights reserved.
