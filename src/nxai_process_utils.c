@@ -169,8 +169,6 @@ void nxai_vlog( const char *fmt, ... ) {
 pid_t nxai_start_process( char *const argv[] ) {
     pid_t child_pid;
 
-    char *envp[] = { NULL };
-
     // Initialize file actions and attributes objects
     posix_spawn_file_actions_t file_actions;
     posix_spawnattr_t attrp;
@@ -178,7 +176,7 @@ pid_t nxai_start_process( char *const argv[] ) {
     posix_spawnattr_init( &attrp );
 
     // Spawn a new process
-    if ( posix_spawn( &child_pid, argv[0], &file_actions, &attrp, argv, envp ) != 0 ) {
+    if ( posix_spawn( &child_pid, argv[0], &file_actions, &attrp, argv, environ ) != 0 ) {
         // Could not start
         return 1;
     }
