@@ -14,6 +14,8 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+extern char** environ;
+
 char *_start_log_filepath = NULL;
 char *_rotating_log_filepath = NULL;
 char *_log_prefix = NULL;
