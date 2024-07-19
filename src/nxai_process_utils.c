@@ -14,7 +14,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-extern char** environ;
+extern char **environ;
 
 char *_start_log_filepath = NULL;
 char *_rotating_log_filepath = NULL;
@@ -22,6 +22,7 @@ char *_log_prefix = NULL;
 static uint64_t last_timestamp = 0;
 size_t logfile_max_size_mb = 1;
 static bool start_logfile_full = false;
+static bool _log_to_console = false;
 
 uint64_t nxai_current_timestamp_ms() {
     struct timeval te;
@@ -37,10 +38,11 @@ uint64_t nxai_current_timestamp_us() {
     return microseconds;
 }
 
-void nxai_initialise_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix ) {
+void nxai_initialise_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix, bool log_to_console ) {
     _start_log_filepath = strdup( start_log_filepath );
     _rotating_log_filepath = strdup( rotating_log_filepath );
     _log_prefix = strdup( log_prefix );
+    _log_to_console = log_to_console;
     // Create and clear log files
     FILE *logfile = fopen( _start_log_filepath, "w" );
     if ( logfile == NULL ) {
@@ -80,17 +82,19 @@ void nxai_vlog( const char *fmt, ... ) {
     if ( log_prefix == NULL ) {
         log_prefix = "";
     }
-    // Print to console
-    printf( "%s%ld %09lld: ", _log_prefix, timestamp / 1000, (long long) duration );
-    va_start( ap, fmt );
-    vprintf( fmt, ap );
-    va_end( ap );
+
+    if ( _log_to_console == true ) {
+        // Print to console
+        printf( "%s%ld %09lld: ", _log_prefix, timestamp / 1000, (long long) duration );
+        va_start( ap, fmt );
+        vprintf( fmt, ap );
+        va_end( ap );
+    }
 
     if ( _start_log_filepath == NULL || _rotating_log_filepath == NULL ) {
         return;
     }
 
-    va_start( ap, fmt );
     FILE *flogfile = NULL;
 
     // Determine which file to log to
@@ -168,7 +172,7 @@ void nxai_vlog( const char *fmt, ... ) {
     fclose( flogfile );
 }
 
-pid_t nxai_start_process( char *const argv[] ) {
+pid_t nxai_start_process( char *const argv[], bool connect_console ) {
     pid_t child_pid;
 
     // Initialize file actions and attributes objects
@@ -176,6 +180,11 @@ pid_t nxai_start_process( char *const argv[] ) {
     posix_spawnattr_t attrp;
     posix_spawn_file_actions_init( &file_actions );
     posix_spawnattr_init( &attrp );
+
+    if ( connect_console == false ) {
+        // Redirect stdout to /dev/null
+        posix_spawn_file_actions_adddup2( &file_actions, open( "/dev/null", O_WRONLY ), STDOUT_FILENO );
+    }
 
     // Spawn a new process
     if ( posix_spawn( &child_pid, argv[0], &file_actions, &attrp, argv, environ ) != 0 ) {
