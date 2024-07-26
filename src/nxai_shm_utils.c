@@ -26,35 +26,13 @@
 
 #define HEADER_BYTES 4
 
-bool nxai_create_pipe( const char *name ) {
-    // First unlink in case it exists
-    unlink( name );
-    // Create new pipe
-    if ( mkfifo( name, 0600 ) == -1 ) {
-        printf( "Could not create pipe: %s\n", strerror( errno ) );
+bool nxai_create_pipe( int pipefd[2] ) {
+    int result = pipe(pipefd);
+    if (result == -1) {
+        perror("pipe failed");
         return false;
     }
     return true;
-}
-
-int nxai_open_pipe_writing( const char *name ) {
-    for ( size_t index = 0; index < 20; index++ ) {
-        int fd = open( name, O_WRONLY | O_NONBLOCK );// Open as write-only
-        if ( fd < 0 ) {
-            sleep( 1 );
-        } else {
-            return fd;
-        }
-    }
-    return -1;
-}
-
-int nxai_open_pipe_reading( const char *name ) {
-    int fd = open( name, O_RDONLY );
-    if ( fd < 0 ) {
-        return -1;
-    }
-    return fd;
 }
 
 ssize_t nxai_pipe_send( int fd, char signal ) {

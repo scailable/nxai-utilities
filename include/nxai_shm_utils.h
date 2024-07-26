@@ -12,36 +12,8 @@ extern "C" {
 }
 #endif
 
-/**
- * @brief Creates a named pipe.
- *
- * This function first attempts to remove any existing pipe with the same name. Then, it creates a new pipe with the given name.
- * If the pipe creation fails, the function returns false. Otherwise, it returns true.
- *
- * @param name The name of the pipe to create.
- * @return Returns true if the pipe is successfully created, otherwise false.
- */
-bool nxai_create_pipe( const char *name );
 
-/**
- * @brief Opens a named pipe for writing.
- *
- * This function opens the named pipe for writing. If the opening fails, it returns -1. Otherwise, it returns the file descriptor.
- *
- * @param name The name of the pipe to open.
- * @return Returns the file descriptor if the pipe is successfully opened, otherwise -1.
- */
-int nxai_open_pipe_writing( const char *name );
-
-/**
- * @brief Opens a named pipe for reading.
- *
- * This function opens the named pipe for reading. If the opening fails, it returns -1. Otherwise, it returns the file descriptor.
- *
- * @param name The name of the pipe to open.
- * @return Returns the file descriptor if the pipe is successfully opened, otherwise -1.
- */
-int nxai_open_pipe_reading( const char *name );
+bool nxai_create_pipe( int pipefd[2] );
 
 /**
  * @brief Reads a single character from a pipe.
