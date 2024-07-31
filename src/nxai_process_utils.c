@@ -13,6 +13,8 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <stdatomic.h>
 
 extern char **environ;
 
@@ -20,9 +22,13 @@ char *_start_log_filepath = NULL;
 char *_rotating_log_filepath = NULL;
 char *_log_prefix = NULL;
 static uint64_t last_timestamp = 0;
-size_t logfile_max_size_mb = 1;
+size_t logfile_max_size_mb = 10;
 static bool start_logfile_full = false;
+static atomic_int logfile_last_size = -1;
 static bool _log_to_console = false;
+FILE *start_logfile;
+FILE *rotating_logfile;
+pthread_mutex_t rotating_logfile_lock = PTHREAD_MUTEX_INITIALIZER;
 
 uint64_t nxai_current_timestamp_ms() {
     struct timeval te;
@@ -44,17 +50,15 @@ void nxai_initialise_logging( const char *start_log_filepath, const char *rotati
     _log_prefix = strdup( log_prefix );
     _log_to_console = log_to_console;
     // Create and clear log files
-    FILE *logfile = fopen( _start_log_filepath, "w" );
-    if ( logfile == NULL ) {
+    start_logfile = fopen( _start_log_filepath, "w" );
+    if ( start_logfile == NULL ) {
         printf( "Failed to initialise logfile: %s\n", _start_log_filepath );
     }
-    fclose( logfile );
     chmod( _start_log_filepath, 0666 );
-    logfile = fopen( _rotating_log_filepath, "w" );
-    if ( logfile == NULL ) {
+    rotating_logfile = fopen( _rotating_log_filepath, "w" );
+    if ( rotating_logfile == NULL ) {
         printf( "Failed to initialise logfile: %s\n", _rotating_log_filepath );
     }
-    fclose( logfile );
     chmod( _rotating_log_filepath, 0666 );
 }
 
@@ -62,6 +66,10 @@ void nxai_finalise_logging() {
     free( _start_log_filepath );
     free( _rotating_log_filepath );
     free( _log_prefix );
+    if (start_logfile_full == false) {
+        fclose( start_logfile );
+    }
+    fclose( rotating_logfile );
 }
 
 void nxai_vlog( const char *fmt, ... ) {
@@ -99,77 +107,86 @@ void nxai_vlog( const char *fmt, ... ) {
 
     // Determine which file to log to
     if ( start_logfile_full == false ) {
-        // Check if start logfile is full
         struct stat file_stat;
-        if ( stat( _start_log_filepath, &file_stat ) < 0 ) {
-            switch ( errno ) {
-                case ENOENT:// No such file or directory
-                    flogfile = fopen( _start_log_filepath, "w" );
-                    printf( "Created log file: %s\n", _start_log_filepath );
-                    break;
-                case EACCES:// Permission denied
-                    printf( "Permission denied trying to open logfile: %s.\n", _start_log_filepath );
-                    break;
-                default:
-                    printf( "An unexpected error occurred accessing log file: %s %s\n", _start_log_filepath, strerror( errno ) );
-                    break;
-            }
-        } else {
-            size_t file_size = file_stat.st_size;
-            if ( file_size < logfile_max_size_mb * 1000000 ) {
-                // Write to start_log
-                flogfile = fopen( _start_log_filepath, "a" );
-                if ( flogfile == NULL ) {
-                    printf( "Couldn't open logfile: %s\n", _start_log_filepath );
+        if (logfile_last_size == -1) {
+            if ( stat( _start_log_filepath, &file_stat ) < 0 ) {
+                switch ( errno ) {
+                    case EACCES:// Permission denied
+                        printf( "Permission denied trying to open logfile: %s.\n", _start_log_filepath );
+                        break;
+                    default:
+                        printf( "An unexpected error occurred accessing log file: %s %s\n", _start_log_filepath, strerror( errno ) );
+                        break;
                 }
-            } else {
-                start_logfile_full = true;
+                return;
             }
+            logfile_last_size = file_stat.st_size;
+        }
+        // Check if start logfile is full
+        if ( logfile_last_size < logfile_max_size_mb * 1000000 ) {
+            // Write to start_log
+            flogfile = start_logfile;
+        } else {
+            start_logfile_full = true;
+            logfile_last_size = -1;
+            fclose(start_logfile);
         }
     }
 
     if ( flogfile == NULL ) {
         // Start logfile was full, open rotating logfile
         struct stat file_stat;
-        if ( stat( _rotating_log_filepath, &file_stat ) < 0 ) {
-            switch ( errno ) {
-                case ENOENT:// No such file or directory
-                    flogfile = fopen( _rotating_log_filepath, "w" );
-                    printf( "Created log file: %s\n", _start_log_filepath );
-                    break;
-                case EACCES:// Permission denied
-                    printf( "Permission denied trying to open logfile: %s.\n", _rotating_log_filepath );
-                    break;
-                default:
-                    printf( "An unexpected error occurred accessing log file: %s %s\n", _rotating_log_filepath, strerror( errno ) );
-                    break;
-            }
-        } else {
-            size_t file_size = file_stat.st_size;
-            if ( file_size > logfile_max_size_mb * 1000000 ) {
+        if (logfile_last_size == -1) {
+            if ( stat( _rotating_log_filepath, &file_stat ) < 0 ) {
+                switch ( errno ) {
+                    case EACCES:// Permission denied
+                        printf( "Permission denied trying to open logfile: %s.\n", _rotating_log_filepath );
+                        break;
+                    default:
+                        printf( "An unexpected error occurred accessing log file: %s %s\n", _rotating_log_filepath, strerror( errno ) );
+                        break;
+                }
+                return;
+            } 
+            logfile_last_size = file_stat.st_size;
+        }
+        if ( logfile_last_size > logfile_max_size_mb * 1000000 ) {
+            pthread_mutex_lock(&rotating_logfile_lock);
+            // Check condition again after acquiring lock
+            if ( logfile_last_size > logfile_max_size_mb * 1000000 ) {
                 // Rotating logfile is full, rename to ".old"
+                fclose(rotating_logfile);
                 size_t new_filepath_length = strlen( _rotating_log_filepath ) + 4 + 1;
                 char *new_filepath = malloc( new_filepath_length );
                 strcpy( new_filepath, _rotating_log_filepath );
                 strcat( new_filepath, ".old" );
                 rename( _rotating_log_filepath, new_filepath );
                 free( new_filepath );
+                // Create new log file
+                rotating_logfile = fopen( _rotating_log_filepath, "w" );
+                logfile_last_size = 0;
             }
-            // Write to rotating log
-            flogfile = fopen( _rotating_log_filepath, "a" );
-            if ( flogfile == NULL ) {
-                printf( "Couldn't open logfile: %s\n", _rotating_log_filepath );
-                return;
-            }
+            pthread_mutex_unlock(&rotating_logfile_lock);
         }
+        // Write to rotating log
+        flogfile = rotating_logfile;
     }
 
     // Write to logfile
-    fprintf( flogfile, "%s%ld %09lld: ", _log_prefix, timestamp / 1000, (long long) duration );
+    int bytes_written = fprintf( flogfile, "%s%ld %09lld: ", _log_prefix, timestamp / 1000, (long long) duration );
+    if (bytes_written < 0) {
+        printf("Failed to write to log file!\n");
+        return;
+    }
+    __atomic_fetch_add(&logfile_last_size, bytes_written, __ATOMIC_SEQ_CST);
     va_start( ap, fmt );
-    vfprintf( flogfile, fmt, ap );
+    bytes_written = vfprintf( flogfile, fmt, ap );
     va_end( ap );
-    fclose( flogfile );
+    if (bytes_written < 0) {
+        printf("Failed to write to log file!\n");
+        return;
+    }
+    __atomic_fetch_add(&logfile_last_size, bytes_written, __ATOMIC_SEQ_CST);
 }
 
 pid_t nxai_start_process( char *const argv[], bool connect_console ) {
