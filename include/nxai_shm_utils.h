@@ -8,11 +8,6 @@ extern "C" {
 #include <stdint.h>
 #include <sys/types.h>
 
-#ifdef __cplusplus
-}
-#endif
-
-
 bool nxai_create_pipe( int pipefd[2] );
 
 /**
@@ -163,3 +158,7 @@ int nxai_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size );
  * @return Size of the shared memory segment minus HEADER_BYTES
  */
 size_t nxai_shm_get_size( int shm_id );
+
+#ifdef __cplusplus
+}
+#endif
