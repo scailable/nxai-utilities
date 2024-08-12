@@ -311,6 +311,55 @@ def executeGetRequest(url, timeout=10):
         raise Exception(f"Request error: {e}. \n URL: {url}")
 
 
+def create_shm(size: int) -> ipc.SharedMemory:
+    """
+    Creates a new shared memory segment with a specified size and initializes it.
+
+    This function allocates a new shared memory segment with a size large enough to hold
+    the requested data plus an additional 4 bytes for a header. The header is intended
+    to store metadata about the data stored in the shared memory, such as its size.
+
+    Parameters:
+    - size (int): The size of the data to be stored in the shared memory, excluding the header.
+
+    Returns:
+    - ipc.SharedMemory: A new shared memory segment object initialized with the specified size.
+                          The segment is created with IPC_CREAT and IPC_EXCL flags, meaning
+                          it will only be created if it does not already exist, and an attempt
+                          to attach to an existing segment with the same key will fail.
+
+    Note: The actual size of the shared memory segment is size + 4 bytes to accommodate
+          the header.
+    """
+    # Add enough space for header
+    shm_size = size + 4
+    shm = ipc.SharedMemory(None, size=shm_size, flags=(ipc.IPC_CREAT | ipc.IPC_EXCL))
+    return shm
+
+
+def write_shm(shm: ipc.SharedMemory, data: bytes):
+    """
+    Writes data to a shared memory segment.
+
+    This function writes both the size of the data and the data itself to a shared memory segment.
+    The size is written first, followed by the data, ensuring that the receiver knows how much data to read.
+
+    @param shm SharedMemory object representing the shared memory segment to write to.
+    @type shm ipc.SharedMemory
+    @param data Bytes to write to the shared memory segment.
+    @type data bytes
+    @return None
+    @throws Exception If an error occurs during the write operation.
+    """
+    data_size = len(data)
+    # Parse size to bytes
+    data_size_bytes = struct.pack("<I", data_size)
+    # Write data size
+    shm.write(data_size_bytes)
+    # Write data
+    shm.write(data, offset=4)
+
+
 def read_shm(shm_key: int) -> bytes:
     """
     Reads data from a shared memory segment using a given key.
