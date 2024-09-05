@@ -1,10 +1,12 @@
 #include "nxai_shm_utils.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -27,9 +29,9 @@
 #define HEADER_BYTES 4
 
 bool nxai_create_pipe( int pipefd[2] ) {
-    int result = pipe(pipefd);
-    if (result == -1) {
-        perror("pipe failed");
+    int result = pipe( pipefd );
+    if ( result == -1 ) {
+        perror( "pipe failed" );
         return false;
     }
     return true;
@@ -76,6 +78,15 @@ void nxai_pipe_close( int fd ) {
     if ( close( fd ) == -1 ) {
         printf( "Could not close pipe: %s\n", strerror( errno ) );
     }
+}
+
+key_t nxai_shm_create_random( size_t size, int *shm_id ) {
+    key_t shm_key = rand() % INT_MAX;
+    *shm_id = shmget( shm_key, size + HEADER_BYTES, 0666 | IPC_CREAT );
+    if ( *shm_id == -1 ) {
+        perror( "Failed to create SHM:" );
+    }
+    return shm_key;
 }
 
 key_t nxai_shm_create( char *path, int project_id, size_t size, int *shm_id ) {

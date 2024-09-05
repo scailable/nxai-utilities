@@ -43,6 +43,8 @@ char nxai_pipe_timed_read( int fd, int timeout );
  */
 void nxai_pipe_close( int semaphore );
 
+key_t nxai_shm_create_random( size_t size, int *shm_id );
+
 /**
  * @brief Sends a single character through a pipe.
  *
