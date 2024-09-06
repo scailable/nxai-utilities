@@ -81,11 +81,14 @@ void nxai_pipe_close( int fd ) {
 }
 
 key_t nxai_shm_create_random( size_t size, int *shm_id ) {
-    key_t shm_key = rand() % INT_MAX;
-    *shm_id = shmget( shm_key, size + HEADER_BYTES, 0666 | IPC_CREAT );
-    if ( *shm_id == -1 ) {
-        perror( "Failed to create SHM:" );
+    int new_id = -1;
+    key_t shm_key;
+    // Keep trying random keys until unused is found
+    while ( new_id == -1 ) {
+        shm_key = rand();
+        new_id = shmget( shm_key, size + HEADER_BYTES, 0666 | IPC_CREAT | IPC_EXCL );
     }
+    *shm_id = new_id;
     return shm_key;
 }
 
