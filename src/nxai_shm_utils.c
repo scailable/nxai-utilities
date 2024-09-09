@@ -10,6 +10,10 @@
 #include <string.h>
 #include <unistd.h>
 
+#ifdef NXAI_DEBUG
+#include "memory_leak_detector.h"
+#endif
+
 #ifdef __MUSL__
 // musl crosscompiler doesn't find time.h otherwise
 #include "musl_time.h"

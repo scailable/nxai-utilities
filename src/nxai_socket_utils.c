@@ -15,6 +15,10 @@
 #include <sys/types.h>
 #include <sys/un.h>
 
+#ifdef NXAI_DEBUG
+#include "memory_leak_detector.h"
+#endif
+
 const uint8_t MESSAGE_HEADER_LENGTH = 4;
 
 bool nxai_socket_interrupt_signal = false;

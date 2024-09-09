@@ -2,8 +2,10 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <spawn.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -13,8 +15,10 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <pthread.h>
-#include <stdatomic.h>
+
+#ifdef NXAI_DEBUG
+#include "memory_leak_detector.h"
+#endif
 
 extern char **environ;
 
@@ -63,10 +67,12 @@ void nxai_initialise_logging( const char *start_log_filepath, const char *rotati
 }
 
 void nxai_finalise_logging() {
+#ifndef NXAI_DEBUG
     free( _start_log_filepath );
     free( _rotating_log_filepath );
     free( _log_prefix );
-    if (start_logfile_full == false) {
+#endif
+    if ( start_logfile_full == false ) {
         fclose( start_logfile );
     }
     fclose( rotating_logfile );
@@ -108,7 +114,7 @@ void nxai_vlog( const char *fmt, ... ) {
     // Determine which file to log to
     if ( start_logfile_full == false ) {
         struct stat file_stat;
-        if (logfile_last_size == -1) {
+        if ( logfile_last_size == -1 ) {
             if ( stat( _start_log_filepath, &file_stat ) < 0 ) {
                 switch ( errno ) {
                     case EACCES:// Permission denied
@@ -129,14 +135,14 @@ void nxai_vlog( const char *fmt, ... ) {
         } else {
             start_logfile_full = true;
             logfile_last_size = -1;
-            fclose(start_logfile);
+            fclose( start_logfile );
         }
     }
 
     if ( flogfile == NULL ) {
         // Start logfile was full, open rotating logfile
         struct stat file_stat;
-        if (logfile_last_size == -1) {
+        if ( logfile_last_size == -1 ) {
             if ( stat( _rotating_log_filepath, &file_stat ) < 0 ) {
                 switch ( errno ) {
                     case EACCES:// Permission denied
@@ -147,15 +153,15 @@ void nxai_vlog( const char *fmt, ... ) {
                         break;
                 }
                 return;
-            } 
+            }
             logfile_last_size = file_stat.st_size;
         }
         if ( logfile_last_size > logfile_max_size_mb * 1000000 ) {
-            pthread_mutex_lock(&rotating_logfile_lock);
+            pthread_mutex_lock( &rotating_logfile_lock );
             // Check condition again after acquiring lock
             if ( logfile_last_size > logfile_max_size_mb * 1000000 ) {
                 // Rotating logfile is full, rename to ".old"
-                fclose(rotating_logfile);
+                fclose( rotating_logfile );
                 size_t new_filepath_length = strlen( _rotating_log_filepath ) + 4 + 1;
                 char *new_filepath = malloc( new_filepath_length );
                 strcpy( new_filepath, _rotating_log_filepath );
@@ -166,7 +172,7 @@ void nxai_vlog( const char *fmt, ... ) {
                 rotating_logfile = fopen( _rotating_log_filepath, "w" );
                 logfile_last_size = 0;
             }
-            pthread_mutex_unlock(&rotating_logfile_lock);
+            pthread_mutex_unlock( &rotating_logfile_lock );
         }
         // Write to rotating log
         flogfile = rotating_logfile;
@@ -174,19 +180,19 @@ void nxai_vlog( const char *fmt, ... ) {
 
     // Write to logfile
     int bytes_written = fprintf( flogfile, "%s%ld %09lld: ", _log_prefix, timestamp / 1000, (long long) duration );
-    if (bytes_written < 0) {
-        printf("Failed to write to log file!\n");
+    if ( bytes_written < 0 ) {
+        printf( "Failed to write to log file!\n" );
         return;
     }
-    __atomic_fetch_add(&logfile_last_size, bytes_written, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add( &logfile_last_size, bytes_written, __ATOMIC_SEQ_CST );
     va_start( ap, fmt );
     bytes_written = vfprintf( flogfile, fmt, ap );
     va_end( ap );
-    if (bytes_written < 0) {
-        printf("Failed to write to log file!\n");
+    if ( bytes_written < 0 ) {
+        printf( "Failed to write to log file!\n" );
         return;
     }
-    __atomic_fetch_add(&logfile_last_size, bytes_written, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add( &logfile_last_size, bytes_written, __ATOMIC_SEQ_CST );
 }
 
 pid_t nxai_start_process( char *const argv[], bool connect_console ) {
