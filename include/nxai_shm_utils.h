@@ -67,6 +67,10 @@ ssize_t nxai_pipe_send( int fd, char signal );
  */
 int nxai_shm_get( key_t shm_key );
 
+void *nxai_shm_attach( int shm_id );
+
+void nxai_shm_write_to_attached( void *shm_buffer, const char *data, uint32_t size );
+
 /**
  * @brief Creates a shared memory segment.
  *

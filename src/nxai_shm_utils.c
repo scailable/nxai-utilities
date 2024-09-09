@@ -113,18 +113,15 @@ int nxai_shm_get( key_t shm_key ) {
     return shm_id;
 }
 
-bool nxai_shm_write( int shm_id, const char *data, uint32_t size ) {
+void *nxai_shm_attach( int shm_id ) {
     // Attach the shared memory segment to the process's address space.
     // This is done by calling the shmat() function with the shared memory ID.
     // The function returns a pointer to the attached shared memory segment.
-    // The returned pointer is cast to a uint8_t pointer, as the shared memory segment is treated as an array of bytes.
     void *result = shmat( shm_id, NULL, 0 );
-    if ( result == (void *) -1 ) {
-        return false;
-    }
+    return result;
+}
 
-    uint8_t *shm_buffer = (uint8_t *) result;
-
+void nxai_shm_write_to_attached( void *shm_buffer, const char *data, uint32_t size ) {
     // Write the size of the data to the beginning of the shared memory segment.
     // This is done by copying the size (which is an integer) to the shared memory segment.
     // The size is copied as a 4-byte value, as the size is represented as a 32-bit unsigned integer.
@@ -134,10 +131,20 @@ bool nxai_shm_write( int shm_id, const char *data, uint32_t size ) {
     // This is done by copying the data to the shared memory segment, starting from the 4th byte,
     // as the first 4 bytes are used to store the size of the data.
     memcpy( shm_buffer + HEADER_BYTES, data, size );
+}
+
+bool nxai_shm_write( int shm_id, const char *data, uint32_t size ) {
+
+    void *result = nxai_shm_attach( shm_id );
+    if ( result == (void *) -1 ) {
+        return false;
+    }
+
+    nxai_shm_write_to_attached( result, data, size );
 
     // Detach the shared memory segment from the process's address space.
     // This is done by calling the shmdt() function with the pointer to the shared memory segment.
-    shmdt( shm_buffer );
+    shmdt( result );
 
     return true;
 }
