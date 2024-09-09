@@ -113,7 +113,7 @@ int nxai_shm_get( key_t shm_key ) {
     return shm_id;
 }
 
-bool nxai_shm_write( int shm_id, char *data, uint32_t size ) {
+bool nxai_shm_write( int shm_id, const char *data, uint32_t size ) {
     // Attach the shared memory segment to the process's address space.
     // This is done by calling the shmat() function with the shared memory ID.
     // The function returns a pointer to the attached shared memory segment.

@@ -94,7 +94,7 @@ key_t nxai_shm_create( char *path, int project_id, size_t size, int *shm_id );
  *
  * @note This function does not check if the shared memory segment is large enough to hold the data. It is the responsibility of the caller to ensure this.
  */
-bool nxai_shm_write( int shm_id, char *data, uint32_t size );
+bool nxai_shm_write( int shm_id, const char *data, uint32_t size );
 
 /**
  * @brief Reads data from shared memory.
