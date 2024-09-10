@@ -149,19 +149,23 @@ bool nxai_shm_write( int shm_id, const char *data, uint32_t size ) {
     return true;
 }
 
-void *nxai_shm_read( int shm_id, size_t *data_length, char **payload_data ) {
-    void *shared_data = shmat( shm_id, NULL, 0 );
-    if ( shared_data == (void *) -1 ) {
-        return NULL;
-    }
+void nxai_shm_read_from_attached( void *shm_pointer, size_t *data_length, char **payload_data ) {
     // The first 4 bytes of the shared memory is always the size of the tensor
     uint32_t size;
-    memcpy( &size, shared_data, HEADER_BYTES );
+    memcpy( &size, shm_pointer, HEADER_BYTES );
     *data_length = (size_t) size;
     // Return pointer to the payload data after the size header
-    *payload_data = (char *) shared_data + HEADER_BYTES;
+    *payload_data = (char *) shm_pointer + HEADER_BYTES;
+}
+
+void *nxai_shm_read( int shm_id, size_t *data_length, char **payload_data ) {
+    void *shm_pointer = shmat( shm_id, NULL, 0 );
+    if ( shm_pointer == (void *) -1 ) {
+        return NULL;
+    }
+    nxai_shm_read_from_attached( shm_pointer, data_length, payload_data );
     // Return pointer to data after size
-    return shared_data;
+    return shm_pointer;
 }
 
 void nxai_shm_close( void *memory_address ) {

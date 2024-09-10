@@ -100,6 +100,8 @@ key_t nxai_shm_create( char *path, int project_id, size_t size, int *shm_id );
  */
 bool nxai_shm_write( int shm_id, const char *data, uint32_t size );
 
+void nxai_shm_read_from_attached( void *shm_pointer, size_t *data_length, char **payload_data );
+
 /**
  * @brief Reads data from shared memory.
  *
