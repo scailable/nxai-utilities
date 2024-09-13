@@ -103,8 +103,6 @@ mpack_tree_t *copy_yyjson_to_mpack( yyjson_val *input_object ) {
     mpack_tree_init_data( tree, new_buffer, buffer_length );
     mpack_tree_parse( tree );
 
-    nxai_vlog( "Created pipelines data: %p\n", new_buffer );
-
     return tree;
 }
 
