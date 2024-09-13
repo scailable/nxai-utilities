@@ -10,4 +10,7 @@ add_library(nxai-c-utilities
     ${CMAKE_CURRENT_SOURCE_DIR}/src/nxai_socket_utils.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/nxai_shm_utils.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/nxai_process_utils.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mpack.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/yyjson.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/nxai_data_utils.c
 )
