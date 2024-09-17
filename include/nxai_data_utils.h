@@ -13,6 +13,8 @@ extern "C" {
 
 mpack_tree_t *copy_yyjson_to_mpack( yyjson_val *input_object );
 
+mpack_tree_t *copy_mpack_node( mpack_node_t input_node );
+
 void copy_mpack_object_recursive( mpack_node_t node, mpack_writer_t *writer );
 
 #ifdef __cplusplus

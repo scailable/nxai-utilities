@@ -106,6 +106,26 @@ mpack_tree_t *copy_yyjson_to_mpack( yyjson_val *input_object ) {
     return tree;
 }
 
+mpack_tree_t *copy_mpack_node( mpack_node_t input_node ) {
+    // Initialize writer
+    mpack_writer_t writer;
+    char *new_buffer;
+    size_t buffer_length;
+    mpack_writer_init_growable( &writer, &new_buffer, &buffer_length );
+    // Recursively write all values from input object to writer
+    copy_mpack_object_recursive( input_node, &writer );
+    mpack_finish_map( &writer );
+    if ( mpack_writer_destroy( &writer ) != mpack_ok ) {
+        nxai_vlog( "Problem writing data: %s\n", mpack_error_to_string( mpack_writer_error( &writer ) ) );
+    }
+
+    mpack_tree_t *tree = malloc( sizeof( mpack_tree_t ) );
+    mpack_tree_init_data( tree, new_buffer, buffer_length );
+    mpack_tree_parse( tree );
+
+    return tree;
+}
+
 void copy_mpack_object_recursive( mpack_node_t node, mpack_writer_t *writer ) {
     mpack_type_t node_type = mpack_node_type( node );
     switch ( node_type ) {
