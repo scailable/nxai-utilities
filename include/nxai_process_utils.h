@@ -9,6 +9,12 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifdef NXAI_DEBUG
+#define debug_vlog( fmt, args... ) nxai_vlog( fmt, ##args )
+#else
+#define debug_vlog( fmt, args... ) /* Don't do anything in release builds */
+#endif
+
 uint64_t nxai_current_timestamp_ms();
 
 uint64_t nxai_current_timestamp_us();
