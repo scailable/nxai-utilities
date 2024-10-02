@@ -20,7 +20,7 @@ typedef struct count_object_t {
 typedef struct bbox_object_t {
     char *class_name;
     char *format;
-    size_t length;
+    size_t coords_length;
     float *coordinates;
     float *scores;
 } bbox_object_t;
@@ -53,7 +53,7 @@ typedef struct nxai_output_object_t {
     size_t num_outputs;
     tensor_object_t *outputs;
     bbox_object_t *bboxes;
-    size_t num_bboxes;
+    size_t num_classes;
     count_object_t *counts;
     size_t num_counts;
     score_object_t *scores;

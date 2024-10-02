@@ -6,6 +6,7 @@ extern "C" {
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <sys/shm.h>
 #include <sys/types.h>
 
 bool nxai_create_pipe( int pipefd[2] );
