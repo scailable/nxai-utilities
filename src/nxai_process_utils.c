@@ -5,7 +5,6 @@
 #include <pthread.h>
 #include <spawn.h>
 #include <stdarg.h>
-#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -28,7 +27,7 @@ char *_log_prefix = NULL;
 static uint64_t last_timestamp = 0;
 size_t logfile_max_size_mb = 10;
 static bool start_logfile_full = false;
-static atomic_int logfile_last_size = -1;
+static int logfile_last_size = -1;
 static bool _log_to_console = false;
 FILE *start_logfile;
 FILE *rotating_logfile;
@@ -156,24 +155,21 @@ void nxai_vlog( const char *fmt, ... ) {
             }
             logfile_last_size = file_stat.st_size;
         }
+        pthread_mutex_lock( &rotating_logfile_lock );
         if ( logfile_last_size > logfile_max_size_mb * 1000000 ) {
-            pthread_mutex_lock( &rotating_logfile_lock );
-            // Check condition again after acquiring lock
-            if ( logfile_last_size > logfile_max_size_mb * 1000000 ) {
-                // Rotating logfile is full, rename to ".old"
-                fclose( rotating_logfile );
-                size_t new_filepath_length = strlen( _rotating_log_filepath ) + 4 + 1;
-                char *new_filepath = malloc( new_filepath_length );
-                strcpy( new_filepath, _rotating_log_filepath );
-                strcat( new_filepath, ".old" );
-                rename( _rotating_log_filepath, new_filepath );
-                free( new_filepath );
-                // Create new log file
-                rotating_logfile = fopen( _rotating_log_filepath, "w" );
-                logfile_last_size = 0;
-            }
-            pthread_mutex_unlock( &rotating_logfile_lock );
+            // Rotating logfile is full, rename to ".old"
+            fclose( rotating_logfile );
+            size_t new_filepath_length = strlen( _rotating_log_filepath ) + 4 + 1;
+            char *new_filepath = malloc( new_filepath_length );
+            strcpy( new_filepath, _rotating_log_filepath );
+            strcat( new_filepath, ".old" );
+            rename( _rotating_log_filepath, new_filepath );
+            free( new_filepath );
+            // Create new log file
+            rotating_logfile = fopen( _rotating_log_filepath, "w" );
+            logfile_last_size = 0;
         }
+        pthread_mutex_unlock( &rotating_logfile_lock );
         // Write to rotating log
         flogfile = rotating_logfile;
     }
@@ -184,7 +180,7 @@ void nxai_vlog( const char *fmt, ... ) {
         printf( "Failed to write to log file!\n" );
         return;
     }
-    __atomic_fetch_add( &logfile_last_size, bytes_written, __ATOMIC_SEQ_CST );
+    logfile_last_size += bytes_written;
     va_start( ap, fmt );
     bytes_written = vfprintf( flogfile, fmt, ap );
     va_end( ap );
@@ -192,7 +188,10 @@ void nxai_vlog( const char *fmt, ... ) {
         printf( "Failed to write to log file!\n" );
         return;
     }
-    __atomic_fetch_add( &logfile_last_size, bytes_written, __ATOMIC_SEQ_CST );
+    logfile_last_size += bytes_written;
+#ifdef NXAI_DEBUG
+    fflush( flogfile );// Flush writing file to make sure latest prints are logged
+#endif
 }
 
 pid_t nxai_start_process( char *const argv[], bool connect_console ) {
