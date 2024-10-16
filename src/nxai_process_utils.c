@@ -160,7 +160,7 @@ void nxai_vlog( const char *fmt, ... ) {
             // Rotating logfile is full, rename to ".old"
             fclose( rotating_logfile );
             size_t new_filepath_length = strlen( _rotating_log_filepath ) + 4 + 1;
-            char *new_filepath = malloc( new_filepath_length );
+            char *new_filepath = (char *) malloc( new_filepath_length );
             strcpy( new_filepath, _rotating_log_filepath );
             strcat( new_filepath, ".old" );
             rename( _rotating_log_filepath, new_filepath );
