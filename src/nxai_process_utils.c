@@ -29,9 +29,13 @@ size_t logfile_max_size_mb = 10;
 static bool start_logfile_full = false;
 static int logfile_last_size = -1;
 static bool _log_to_console = false;
+static bool _log_to_file = true;
+static int _log_verbosity_level = 1;
 FILE *start_logfile;
 FILE *rotating_logfile;
 pthread_mutex_t rotating_logfile_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void nxai_vvlog( const char *fmt, va_list *args );
 
 uint64_t nxai_current_timestamp_ms() {
     struct timeval te;
@@ -47,22 +51,26 @@ uint64_t nxai_current_timestamp_us() {
     return microseconds;
 }
 
-void nxai_initialise_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix, bool log_to_console ) {
+void nxai_initialise_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix, bool log_to_console, bool log_to_file, int log_verbosity_level ) {
     _start_log_filepath = strdup( start_log_filepath );
     _rotating_log_filepath = strdup( rotating_log_filepath );
     _log_prefix = strdup( log_prefix );
     _log_to_console = log_to_console;
-    // Create and clear log files
-    start_logfile = fopen( _start_log_filepath, "w" );
-    if ( start_logfile == NULL ) {
-        printf( "Failed to initialise logfile: %s\n", _start_log_filepath );
+    _log_verbosity_level = log_verbosity_level;
+    _log_to_file = log_to_file;
+    if ( _log_to_file == true ) {
+        // Create and clear log files
+        start_logfile = fopen( _start_log_filepath, "w" );
+        if ( start_logfile == NULL ) {
+            printf( "Failed to initialise logfile: %s\n", _start_log_filepath );
+        }
+        chmod( _start_log_filepath, 0666 );
+        rotating_logfile = fopen( _rotating_log_filepath, "w" );
+        if ( rotating_logfile == NULL ) {
+            printf( "Failed to initialise logfile: %s\n", _rotating_log_filepath );
+        }
+        chmod( _rotating_log_filepath, 0666 );
     }
-    chmod( _start_log_filepath, 0666 );
-    rotating_logfile = fopen( _rotating_log_filepath, "w" );
-    if ( rotating_logfile == NULL ) {
-        printf( "Failed to initialise logfile: %s\n", _rotating_log_filepath );
-    }
-    chmod( _rotating_log_filepath, 0666 );
 }
 
 void nxai_finalise_logging() {
@@ -77,8 +85,32 @@ void nxai_finalise_logging() {
     fclose( rotating_logfile );
 }
 
+void nxai_vlog_verbose( const char *fmt, ... ) {
+    if ( _log_verbosity_level > 1 ) {
+        va_list args;
+        va_start( args, fmt );
+        nxai_vvlog( fmt, &args );
+        va_end( args );
+    }
+}
+
 void nxai_vlog( const char *fmt, ... ) {
-    va_list ap;
+    va_list args;
+    va_start( args, fmt );
+    nxai_vvlog( fmt, &args );
+    va_end( args );
+}
+
+static void nxai_vvlog( const char *fmt, va_list *args ) {
+
+    if ( _log_verbosity_level == 0 || ( _log_to_file == false && _log_to_console == false ) ) {
+        // Logging is turned off. Return immediately
+        return;
+    }
+
+    // Copy argument list
+    va_list copied_args;
+    va_copy( copied_args, *args );
 
     // Get the current timestamp
     uint64_t timestamp = nxai_current_timestamp_us();
@@ -99,12 +131,10 @@ void nxai_vlog( const char *fmt, ... ) {
     if ( _log_to_console == true ) {
         // Print to console
         printf( "%s%ld %09lld: ", _log_prefix, timestamp / 1000, (long long) duration );
-        va_start( ap, fmt );
-        vprintf( fmt, ap );
-        va_end( ap );
+        vprintf( fmt, *args );
     }
 
-    if ( _start_log_filepath == NULL || _rotating_log_filepath == NULL ) {
+    if ( _start_log_filepath == NULL || _rotating_log_filepath == NULL || _log_to_file == false ) {
         return;
     }
 
@@ -181,9 +211,7 @@ void nxai_vlog( const char *fmt, ... ) {
         return;
     }
     logfile_last_size += bytes_written;
-    va_start( ap, fmt );
-    bytes_written = vfprintf( flogfile, fmt, ap );
-    va_end( ap );
+    bytes_written = vfprintf( flogfile, fmt, copied_args );
     if ( bytes_written < 0 ) {
         printf( "Failed to write to log file!\n" );
         return;
