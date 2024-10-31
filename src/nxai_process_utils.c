@@ -23,7 +23,10 @@ extern char **environ;
 
 char *_start_log_filepath = NULL;
 char *_rotating_log_filepath = NULL;
+char *_log_log_filepath = NULL;
 char *_log_prefix = NULL;
+char *_old_logfile_path = NULL;
+
 static uint64_t last_timestamp = 0;
 size_t logfile_max_size_mb = 10;
 static bool start_logfile_full = false;
@@ -70,6 +73,11 @@ void nxai_initialise_logging( const char *start_log_filepath, const char *rotati
             printf( "Failed to initialise logfile: %s\n", _rotating_log_filepath );
         }
         chmod( _rotating_log_filepath, 0666 );
+        // Create old log file path
+        size_t old_filepath_length = strlen( _rotating_log_filepath ) + 5 + 1;
+        _old_logfile_path = (char *) malloc( old_filepath_length );
+        strcpy( _old_logfile_path, _rotating_log_filepath );
+        strcat( _old_logfile_path, ".old" );
     }
 }
 
@@ -83,6 +91,7 @@ void nxai_finalise_logging() {
         fclose( start_logfile );
     }
     fclose( rotating_logfile );
+    free( _old_logfile_path );
 }
 
 void nxai_vlog_verbose( const char *fmt, ... ) {
@@ -189,12 +198,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
         if ( logfile_last_size > logfile_max_size_mb * 1000000 ) {
             // Rotating logfile is full, rename to ".old"
             fclose( rotating_logfile );
-            size_t new_filepath_length = strlen( _rotating_log_filepath ) + 4 + 1;
-            char *new_filepath = (char *) malloc( new_filepath_length );
-            strcpy( new_filepath, _rotating_log_filepath );
-            strcat( new_filepath, ".old" );
-            rename( _rotating_log_filepath, new_filepath );
-            free( new_filepath );
+            rename( _rotating_log_filepath, _old_logfile_path );
             // Create new log file
             rotating_logfile = fopen( _rotating_log_filepath, "w" );
             logfile_last_size = 0;
