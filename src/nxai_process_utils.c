@@ -197,10 +197,23 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
         pthread_mutex_lock( &rotating_logfile_lock );
         if ( logfile_last_size > logfile_max_size_mb * 1000000 ) {
             // Rotating logfile is full, rename to ".old"
-            fclose( rotating_logfile );
-            rename( _rotating_log_filepath, _old_logfile_path );
+            if ( rotating_logfile != NULL ) {
+                fclose( rotating_logfile );
+                rotating_logfile = NULL;
+                int result = rename( _rotating_log_filepath, _old_logfile_path );
+                if ( result != 0 ) {
+                    perror( "Error renaming file" );
+                    pthread_mutex_unlock( &rotating_logfile_lock );
+                    return;
+                }
+            }
             // Create new log file
             rotating_logfile = fopen( _rotating_log_filepath, "w" );
+            if ( rotating_logfile == NULL ) {
+                perror( "Error creating log file" );
+                pthread_mutex_unlock( &rotating_logfile_lock );
+                return;
+            }
             logfile_last_size = 0;
         }
         pthread_mutex_unlock( &rotating_logfile_lock );
