@@ -22,7 +22,7 @@ typedef struct bbox_object_t {
     char *format;
     size_t coords_length;
     float *coordinates;
-    float *scores;
+    float *confidences;
 } bbox_object_t;
 
 typedef struct tensor_object_t {

@@ -86,12 +86,12 @@ void nxai_finalise_logging() {
     free( _start_log_filepath );
     free( _rotating_log_filepath );
     free( _log_prefix );
+    free( _old_logfile_path );
 #endif
     if ( start_logfile_full == false ) {
         fclose( start_logfile );
     }
     fclose( rotating_logfile );
-    free( _old_logfile_path );
 }
 
 void nxai_vlog_verbose( const char *fmt, ... ) {
