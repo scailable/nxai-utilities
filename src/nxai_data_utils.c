@@ -126,13 +126,13 @@ mpack_tree_t *copy_mpack_node( mpack_node_t input_node ) {
     return tree;
 }
 
-void print_mpack_object( mpack_node_t node ) {
+void _print_mpack_object( mpack_node_t node, int indent ) {
     mpack_type_t node_type = mpack_node_type( node );
+
     switch ( node_type ) {
-        case mpack_type_bool: {
+        case mpack_type_bool:
             printf( "%s", mpack_node_bool( node ) ? "true" : "false" );
             break;
-        }
         case mpack_type_uint:
             printf( "%zu", mpack_node_u64( node ) );
             break;
@@ -152,39 +152,59 @@ void print_mpack_object( mpack_node_t node ) {
             break;
         }
         case mpack_type_bin: {
-            printf( "< binary size %zu >", mpack_node_bin_size( node ) );
+            printf( "< binary data, size %zu >\n", mpack_node_bin_size( node ) );
             break;
         }
         case mpack_type_array: {
             size_t arr_length = mpack_node_array_length( node );
-            printf( "[ " );
+            // Print indentation
+            for ( int i = 0; i < indent; i++ ) {
+                printf( "  " );
+            }
+            printf( "[\n" );
             for ( size_t arr_index = 0; arr_index < arr_length; arr_index++ ) {
-                print_mpack_object( mpack_node_array_at( node, arr_index ) );
-                printf( ", " );
+                // Print indentation
+                for ( int i = 0; i < indent; i++ ) {
+                    printf( "  " );
+                }
+                _print_mpack_object( mpack_node_array_at( node, arr_index ), indent + 1 );
+                printf( ",\n" );
+            }
+            for ( int i = 0; i < indent; i++ ) {
+                printf( "  " );
             }
             printf( "]" );
             break;
         }
         case mpack_type_map: {
             size_t map_length = mpack_node_map_count( node );
-            printf( "{ " );
+            printf( "{\n" );
             for ( size_t map_index = 0; map_index < map_length; map_index++ ) {
+                // Print indentation
+                for ( int i = 0; i < indent; i++ ) {
+                    printf( "  " );
+                }
                 mpack_node_t key_node = mpack_node_map_key_at( node, map_index );
-                // Write map key
-                print_mpack_object( key_node );
-                printf( " : " );
-                // Write map value
+                _print_mpack_object( key_node, indent + 1 );
+                printf( ":" );
                 mpack_node_t value_node = mpack_node_map_value_at( node, map_index );
-                print_mpack_object( value_node );
-                printf( " , " );
+                _print_mpack_object( value_node, indent + 1 );
+                printf( ",\n" );
             }
-            printf( " }" );
+            for ( int i = 0; i < indent; i++ ) {
+                printf( "  " );
+            }
+            printf( "}" );
             break;
         }
         default:
             printf( "Warning! Unknown mpack type: %d\n", node_type );
             break;
     }
+}
+
+void print_mpack_object( mpack_node_t node ) {
+    _print_mpack_object( node, 0 );
 }
 
 void copy_mpack_object_recursive( mpack_node_t node, mpack_writer_t *writer ) {
