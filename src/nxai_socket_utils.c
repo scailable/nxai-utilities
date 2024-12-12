@@ -153,13 +153,12 @@ int nxai_socket_await_message( int socket_fd, size_t *allocated_buffer_size, cha
  * @brief Listen on socket for incoming messages
  *
  */
-void nxai_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t, int ) ) {
+int32_t nxai_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t, int ) ) {
 
     // Create socket
     int socket_fd = nxai_socket_create_listener( socket_path );
     if ( socket_fd == -1 ) {
-        printf( "Error: Failed to create listening socket.\n" );
-        return;
+        return 1;
     }
 
     uint32_t message_length;
@@ -191,6 +190,8 @@ void nxai_socket_start_listener( const char *socket_path, void ( *callback_funct
 
     // Unlink socket file so it can be used again
     unlink( socket_path );
+
+    return 0;
 }
 
 int32_t nxai_socket_connect( const char *socket_path ) {

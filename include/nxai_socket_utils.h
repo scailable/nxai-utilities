@@ -87,7 +87,7 @@ int nxai_socket_await_message( int socket_fd, size_t *allocated_buffer_size, cha
  * @return The file descriptor for the newly created socket, or -1 if an error occurred during 
  * socket creation, binding, or listening.
  */
-void nxai_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t, int ) );
+int32_t nxai_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t, int ) );
 
 /**
  * @brief Connects to a Unix domain socket at a given path.
