@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <signal.h>
 #include <spawn.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -13,6 +14,8 @@
 #include <strings.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifdef NXAI_DEBUG
@@ -239,8 +242,9 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
 #endif
 }
 
-pid_t nxai_start_process( char *const argv[], bool connect_console, int cerr_pipe[2] ) {
+pid_t nxai_start_process( char *const argv[], bool connect_console, int *stderr_pipe ) {
     pid_t child_pid;
+    int cerr_pipe[2];
 
     // Initialize file actions and attributes objects
     posix_spawn_file_actions_t file_actions;
@@ -270,6 +274,56 @@ pid_t nxai_start_process( char *const argv[], bool connect_console, int cerr_pip
     posix_spawn_file_actions_destroy( &file_actions );
     posix_spawnattr_destroy( &attrp );
     close( cerr_pipe[1] );
+    *stderr_pipe = cerr_pipe[0];
 
     return child_pid;
+}
+
+static void sigchld_handler( int signum ) {
+    // Empty handler, just to register the signal
+}
+
+int waitpid_timeout( pid_t process_id, int timeout_seconds ) {
+    struct sigaction sa;
+    sigset_t mask;
+
+    // Register SIGCHLD handler
+    sa.sa_handler = sigchld_handler;
+    sigemptyset( &sa.sa_mask );
+    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+    if ( sigaction( SIGCHLD, &sa, NULL ) == -1 ) {
+        perror( "sigaction" );
+        return -1;
+    }
+
+    // Block SIGCHLD
+    sigemptyset( &mask );
+    sigaddset( &mask, SIGCHLD );
+    if ( sigprocmask( SIG_BLOCK, &mask, NULL ) == -1 ) {
+        perror( "sigprocmask" );
+        return -1;
+    }
+
+    // Set up timeout
+    struct timespec ts;
+    clock_gettime( CLOCK_REALTIME, &ts );
+    ts.tv_sec += timeout_seconds;
+
+    int sig;
+    while ( ( sig = sigtimedwait( &mask, NULL, &ts ) ) == -1 && errno == EINTR );
+
+    // Check if SIGCHLD was received or timeout occurred
+    if ( sig == SIGCHLD ) {
+        // Child process finished within timeout
+        int status;
+        waitpid( process_id, &status, WNOHANG );
+        return WEXITSTATUS( status );
+    } else if ( sig == -1 && errno == ETIMEDOUT ) {
+        // Timeout expired before child finished
+        kill( process_id, SIGKILL );// Kill the child process
+        return -1;                  // Indicate timeout
+    } else {
+        // Error in sigtimedwait
+        return -1;
+    }
 }

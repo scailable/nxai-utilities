@@ -27,7 +27,9 @@ void nxai_vlog_verbose( const char *fmt, ... );
 
 void nxai_vlog( const char *fmt, ... );
 
-pid_t nxai_start_process( char *const argv[], bool connect_console, int cerr_pipe[2] );
+pid_t nxai_start_process( char *const argv[], bool connect_console, int *stderr_pipe );
+
+int waitpid_timeout( pid_t process_id, int timeout_seconds );
 
 #ifdef __cplusplus
 }
