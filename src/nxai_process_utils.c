@@ -239,7 +239,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
 #endif
 }
 
-pid_t nxai_start_process( char *const argv[], bool connect_console ) {
+pid_t nxai_start_process( char *const argv[], bool connect_console, int cerr_pipe[2] ) {
     pid_t child_pid;
 
     // Initialize file actions and attributes objects
@@ -253,6 +253,13 @@ pid_t nxai_start_process( char *const argv[], bool connect_console ) {
         posix_spawn_file_actions_adddup2( &file_actions, open( "/dev/null", O_WRONLY ), STDOUT_FILENO );
     }
 
+    // Connect stderr
+    pipe( cerr_pipe );
+    fcntl( cerr_pipe[0], F_SETFL, O_NONBLOCK );
+    posix_spawn_file_actions_addclose( &file_actions, cerr_pipe[0] );
+    posix_spawn_file_actions_adddup2( &file_actions, cerr_pipe[1], STDERR_FILENO );
+    posix_spawn_file_actions_addclose( &file_actions, cerr_pipe[1] );
+
     // Spawn a new process
     if ( posix_spawn( &child_pid, argv[0], &file_actions, &attrp, argv, environ ) != 0 ) {
         // Could not start
@@ -262,6 +269,7 @@ pid_t nxai_start_process( char *const argv[], bool connect_console ) {
     // Cleanup
     posix_spawn_file_actions_destroy( &file_actions );
     posix_spawnattr_destroy( &attrp );
+    close( cerr_pipe[1] );
 
     return child_pid;
 }
