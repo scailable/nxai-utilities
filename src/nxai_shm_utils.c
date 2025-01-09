@@ -181,6 +181,7 @@ int nxai_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size ) {
 
     // Remove old SHM
     if ( nxai_shm_destroy( old_shm_id ) != 0 ) {
+        fprintf( stderr, "Error! Could not destroy Shared Memory segment with ID %d.\n", old_shm_id );
         return -1;
     }
 
