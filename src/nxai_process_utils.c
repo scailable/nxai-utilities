@@ -237,9 +237,9 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
         return;
     }
     logfile_last_size += bytes_written;
-#ifdef NXAI_DEBUG
-    fflush( flogfile );// Flush writing file to make sure latest prints are logged
-#endif
+    if ( _log_verbosity_level > 1 ) {
+        fflush( flogfile );// Flush writing file to make sure latest prints are logged
+    }
 }
 
 pid_t nxai_start_process( char *const argv[], bool connect_console, int *stderr_pipe ) {
