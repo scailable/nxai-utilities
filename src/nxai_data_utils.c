@@ -17,9 +17,9 @@
 #endif
 
 // Static function declarations
-static void _copy_yyjson_to_mpack_recursive( yyjson_val *input_object, mpack_writer_t *writer );
+static bool _copy_yyjson_to_mpack_recursive( yyjson_val *input_object, mpack_writer_t *writer );
 
-static void _copy_yyjson_to_mpack_recursive( yyjson_val *input_object, mpack_writer_t *writer ) {
+static bool _copy_yyjson_to_mpack_recursive( yyjson_val *input_object, mpack_writer_t *writer ) {
     yyjson_type object_type = yyjson_get_type( input_object );
     switch ( object_type ) {
         case YYJSON_TYPE_OBJ: {
@@ -32,7 +32,10 @@ static void _copy_yyjson_to_mpack_recursive( yyjson_val *input_object, mpack_wri
                 // Write obj key
                 mpack_write_cstr( writer, yyjson_get_str( key ) );
                 // Recursive function will write value
-                _copy_yyjson_to_mpack_recursive( val, writer );
+                bool success = _copy_yyjson_to_mpack_recursive( val, writer );
+                if ( success == false ) {
+                    return false;
+                }
             }
             mpack_finish_map( writer );
             break;
@@ -45,7 +48,10 @@ static void _copy_yyjson_to_mpack_recursive( yyjson_val *input_object, mpack_wri
             yyjson_val *val;
             for ( ( idx ) = 0, ( val ) = yyjson_arr_get_first( input_object ); ( idx ) < ( arr_length ); ( idx )++, ( val ) = unsafe_yyjson_get_next( val ) ) {
                 // Each value of array will be written by recursive function
-                _copy_yyjson_to_mpack_recursive( val, writer );
+                bool success = _copy_yyjson_to_mpack_recursive( val, writer );
+                if ( success == false ) {
+                    return false;
+                }
             }
             mpack_finish_array( writer );
             break;
@@ -82,8 +88,9 @@ static void _copy_yyjson_to_mpack_recursive( yyjson_val *input_object, mpack_wri
         }
         default:
             nxai_vlog( "WARNING! Unknown YYJSON_TYPE %d\n", object_type );
-            break;
+            return false;
     }
+    return true;
 }
 
 mpack_tree_t *copy_yyjson_to_mpack( yyjson_val *input_object ) {
@@ -93,10 +100,11 @@ mpack_tree_t *copy_yyjson_to_mpack( yyjson_val *input_object ) {
     size_t buffer_length;
     mpack_writer_init_growable( &writer, &new_buffer, &buffer_length );
     // Recursively write all values from input object to writer
-    _copy_yyjson_to_mpack_recursive( input_object, &writer );
+    bool success = _copy_yyjson_to_mpack_recursive( input_object, &writer );
     mpack_finish_map( &writer );
-    if ( mpack_writer_destroy( &writer ) != mpack_ok ) {
+    if ( mpack_writer_destroy( &writer ) != mpack_ok || success == false ) {
         nxai_vlog( "Problem writing data: %s\n", mpack_error_to_string( mpack_writer_error( &writer ) ) );
+        return NULL;
     }
 
     mpack_tree_t *tree = malloc( sizeof( mpack_tree_t ) );
