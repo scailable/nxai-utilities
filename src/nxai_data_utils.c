@@ -156,7 +156,7 @@ void _print_mpack_object( mpack_node_t node, int indent ) {
         case mpack_type_str: {
             const char *string = mpack_node_str( node );
             size_t string_length = mpack_node_strlen( node );
-            printf( "\"%.*s\"", string_length, string );
+            printf( "\"%.*s\"", (int) string_length, string );
             break;
         }
         case mpack_type_bin: {

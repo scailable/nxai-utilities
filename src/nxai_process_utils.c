@@ -170,7 +170,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
             logfile_last_size = file_stat.st_size;
         }
         // Check if start logfile is full
-        if ( logfile_last_size < logfile_max_size_mb * 1000000 ) {
+        if ( (size_t) logfile_last_size < logfile_max_size_mb * 1000000 ) {
             // Write to start_log
             flogfile = start_logfile;
         } else {
@@ -198,7 +198,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
             logfile_last_size = file_stat.st_size;
         }
         pthread_mutex_lock( &rotating_logfile_lock );
-        if ( logfile_last_size > logfile_max_size_mb * 1000000 ) {
+        if ( (size_t) logfile_last_size > logfile_max_size_mb * 1000000 ) {
             // Rotating logfile is full, rename to ".old"
             if ( rotating_logfile != NULL ) {
                 fclose( rotating_logfile );
@@ -281,6 +281,7 @@ pid_t nxai_start_process( char *const argv[], bool connect_console, int *stderr_
 
 static void sigchld_handler( int signum ) {
     // Empty handler, just to register the signal
+    (void) signum;
 }
 
 int waitpid_timeout( pid_t process_id, int timeout_seconds ) {
