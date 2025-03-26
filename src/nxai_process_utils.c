@@ -239,6 +239,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
     logfile_last_size += bytes_written;
     if ( _log_verbosity_level > 1 ) {
         fflush( flogfile );// Flush writing file to make sure latest prints are logged
+        fflush( stdout );
     }
 }
 

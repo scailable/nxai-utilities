@@ -52,6 +52,10 @@ char nxai_pipe_read( int fd ) {
     if ( bytes_read == -1 ) {
         return -1;
     }
+    if ( bytes_read == 0 ) {
+        // No bytes read, possibly pipe closed
+        return -4;
+    }
     return response;
 }
 
@@ -69,12 +73,20 @@ char nxai_pipe_timed_read( int fd, int timeout ) {
 
     rv = select( fd + 1, &set, NULL, NULL, &tv );
     if ( rv == -1 ) {
-        perror( "select" );
+        printf( "Error in select function during pipe timed read: %s\n", strerror( errno ) );
         return -1;
     } else if ( rv == 0 ) {
-        return 0;
+        return -3;
     }
-    read( fd, buff, 1 );
+    ssize_t ret = read( fd, buff, 1 );
+    if ( ret == -1 ) {
+        printf( "Error in read function during pipe timed read: %s\n", strerror( errno ) );
+        return -1;
+    }
+    if ( ret == 0 ) {
+        // No bytes read, possibly pipe closed. Return
+        return -4;
+    }
     return buff[0];
 }
 
