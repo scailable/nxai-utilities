@@ -40,10 +40,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef NXAI_DEBUG
-#include "memory_leak_detector.h"
-#endif
-
 /*==============================================================================
  * Compile-time Options
  *============================================================================*/

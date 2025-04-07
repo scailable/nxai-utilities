@@ -63,7 +63,6 @@ bidirectional_pipe_t nxai_create_pipe( int *error ) {
     }
 
     *error = 0;
-    printf( "Created up read: %d up write %d down read %d down write %d\n", created_pipe.up_pipe[0], created_pipe.up_pipe[1], created_pipe.down_pipe[0], created_pipe.down_pipe[1] );
     return created_pipe;
 }
 
@@ -120,12 +119,10 @@ char nxai_pipe_timed_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION directio
 void nxai_pipe_close( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
     if ( direction == DOWN ) {
         // Close writing up and reading down
-        printf( "Closing %d %d\n", nxai_pipe_get_write_fd( pipe, UP ), nxai_pipe_get_read_fd( pipe, DOWN ) );
         close( nxai_pipe_get_write_fd( pipe, UP ) );
         close( nxai_pipe_get_read_fd( pipe, DOWN ) );
     } else {
         // Close writing down and reading up
-        printf( "Closing %d %d\n", nxai_pipe_get_write_fd( pipe, DOWN ), nxai_pipe_get_read_fd( pipe, UP ) );
         close( nxai_pipe_get_write_fd( pipe, DOWN ) );
         close( nxai_pipe_get_read_fd( pipe, UP ) );
     }
