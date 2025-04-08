@@ -19,7 +19,7 @@ uint64_t nxai_current_timestamp_ms();
 
 uint64_t nxai_current_timestamp_us();
 
-void nxai_initialise_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix, bool log_to_console, bool log_to_file, int log_verbosity_level );
+void nxai_initialize_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix, bool log_to_console, bool log_to_file, int log_verbosity_level );
 
 void nxai_finalise_logging();
 
