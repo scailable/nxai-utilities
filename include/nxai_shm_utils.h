@@ -9,53 +9,33 @@ extern "C" {
 #include <sys/shm.h>
 #include <sys/types.h>
 
-bool nxai_create_pipe( int pipefd[2] );
+typedef struct bidirectional_pipe_t {
+    int up_pipe[2];
+    int down_pipe[2];
+} bidirectional_pipe_t;
 
-/**
- * @brief Reads a single character from a pipe.
- *
- * This function reads a single character from the pipe associated with the provided file descriptor.
- * If the reading fails, it returns -1. Otherwise, it returns the character read.
- *
- * @param fd The file descriptor of the pipe.
- * @return Returns the character read from the pipe, or -1 if an error occurred.
- */
-char nxai_pipe_read( int fd );
+typedef enum {
+    UP = 1,
+    DOWN = 2
+} PIPE_DIRECTION;
 
-/**
- * @brief Reads a single character from a pipe with a timeout.
- *
- * This function reads a single character from the pipe associated with the provided file descriptor within the specified timeout period.
- * If the reading fails, it returns -1. If the timeout expires without data available, it returns 0. Otherwise, it returns the character read.
- *
- * @param fd The file descriptor of the pipe.
- * @param timeout The timeout period in seconds.
- * @return Returns the character read from the pipe, -1 if an error occurred, or 0 if the timeout expired without data available.
- */
-char nxai_pipe_timed_read( int fd, int timeout );
+int nxai_pipe_get_write_fd( bidirectional_pipe_t pipe, PIPE_DIRECTION direction );
 
-/**
- * @brief Closes a named pipe.
- *
- * This function closes the named pipe associated with the provided file descriptor.
- * If the closing fails, it prints an error message.
- *
- * @param fd The file descriptor of the pipe to close.
- */
-void nxai_pipe_close( int semaphore );
+int nxai_pipe_get_read_fd( bidirectional_pipe_t pipe, PIPE_DIRECTION direction );
+
+bidirectional_pipe_t nxai_initialize_pipe( int up_pipe_read, int up_pipe_write, int down_pipe_read, int down_pipe_write );
+
+bidirectional_pipe_t nxai_create_pipe( int *error );
+
+char nxai_pipe_read( bidirectional_pipe_t pipe, PIPE_DIRECTION direction );
+
+char nxai_pipe_timed_read( bidirectional_pipe_t pipe, PIPE_DIRECTION direction, int timeout );
+
+void nxai_pipe_close( bidirectional_pipe_t pipe, PIPE_DIRECTION direction );
+
+ssize_t nxai_pipe_send( bidirectional_pipe_t pipe, PIPE_DIRECTION direction, char signal );
 
 key_t nxai_shm_create_random( size_t size, int *shm_id );
-
-/**
- * @brief Sends a single character through a pipe.
- *
- * This function writes a single character to the pipe associated with the provided file descriptor.
- *
- * @param fd The file descriptor of the pipe.
- * @param signal The character to send through the pipe.
- * @return Returns the number of characters written, or -1 if an error occurred.
- */
-ssize_t nxai_pipe_send( int fd, char signal );
 
 /**
  * @brief Retrieves a shared memory segment.

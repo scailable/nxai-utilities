@@ -32,23 +32,45 @@
 
 #define HEADER_BYTES 4
 
-bool nxai_create_pipe( int pipefd[2] ) {
-    int result = pipe( pipefd );
-    if ( result == -1 ) {
-        perror( "pipe failed" );
-        return false;
+int nxai_pipe_get_write_fd( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
+    return direction == UP ? pipe.up_pipe[1] : pipe.down_pipe[1];
+}
+
+int nxai_pipe_get_read_fd( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
+    return direction == UP ? pipe.up_pipe[0] : pipe.down_pipe[0];
+}
+
+bidirectional_pipe_t nxai_initialize_pipe( int up_pipe_read, int up_pipe_write, int down_pipe_read, int down_pipe_write ) {
+    bidirectional_pipe_t created_pipe = { { up_pipe_read, up_pipe_write }, { down_pipe_read, down_pipe_write } };
+    return created_pipe;
+}
+
+bidirectional_pipe_t nxai_create_pipe( int *error ) {
+    bidirectional_pipe_t created_pipe = { { -1, -1 }, { -1, -1 } };
+
+    // Create up pipe
+    if ( pipe( created_pipe.up_pipe ) == -1 ) {
+        *error = -1;
+        return created_pipe;
     }
-    return true;
+
+    // Create down pipe
+    if ( pipe( created_pipe.down_pipe ) == -1 ) {
+        close( created_pipe.up_pipe[0] );
+        close( created_pipe.up_pipe[1] );
+        *error = -2;
+        return created_pipe;
+    }
+
+    *error = 0;
+    return created_pipe;
 }
 
-ssize_t nxai_pipe_send( int fd, char signal ) {
-    return write( fd, &signal, 1 );
-}
+char nxai_pipe_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction ) {
+    char buffer;
+    ssize_t bytes_read;
 
-char nxai_pipe_read( int fd ) {
-    // Read from FIFO
-    char response;
-    ssize_t bytes_read = read( fd, &response, 1 );
+    bytes_read = read( nxai_pipe_get_read_fd( pipe_fd, direction ), &buffer, 1 );
     if ( bytes_read == -1 ) {
         return -1;
     }
@@ -56,43 +78,53 @@ char nxai_pipe_read( int fd ) {
         // No bytes read, possibly pipe closed
         return -4;
     }
-    return response;
+
+    return buffer;
 }
 
-char nxai_pipe_timed_read( int fd, int timeout ) {
-    fd_set set;
+ssize_t nxai_pipe_send( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction, char signal ) {
+    return write( nxai_pipe_get_write_fd( pipe_fd, direction ), &signal, 1 );
+}
+
+char nxai_pipe_timed_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction, int timeout ) {
+    char buffer;
+    fd_set read_fds;
     struct timeval tv;
-    int rv;
-    char buff[1];
+    ssize_t bytes_read;
 
-    FD_ZERO( &set );
-    FD_SET( fd, &set );
-
+    // Set up select parameters
+    FD_ZERO( &read_fds );
+    FD_SET( nxai_pipe_get_read_fd( pipe_fd, direction ), &read_fds );
     tv.tv_sec = timeout;
     tv.tv_usec = 0;
 
-    rv = select( fd + 1, &set, NULL, NULL, &tv );
-    if ( rv == -1 ) {
-        printf( "Error in select function during pipe timed read: %s\n", strerror( errno ) );
-        return -1;
-    } else if ( rv == 0 ) {
+    // Wait for data or timeout
+    if ( select( nxai_pipe_get_read_fd( pipe_fd, direction ) + 1, &read_fds, NULL, NULL, &tv ) <= 0 ) {
         return -3;
     }
-    ssize_t ret = read( fd, buff, 1 );
-    if ( ret == -1 ) {
+
+    // Read data if available
+    bytes_read = read( nxai_pipe_get_read_fd( pipe_fd, direction ), &buffer, 1 );
+    if ( bytes_read == -1 ) {
         printf( "Error in read function during pipe timed read: %s\n", strerror( errno ) );
         return -1;
     }
-    if ( ret == 0 ) {
+    if ( bytes_read == 0 ) {
         // No bytes read, possibly pipe closed. Return
         return -4;
     }
-    return buff[0];
+    return buffer;
 }
 
-void nxai_pipe_close( int fd ) {
-    if ( close( fd ) == -1 ) {
-        printf( "Could not close pipe: %s\n", strerror( errno ) );
+void nxai_pipe_close( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
+    if ( direction == DOWN ) {
+        // Close writing up and reading down
+        close( nxai_pipe_get_write_fd( pipe, UP ) );
+        close( nxai_pipe_get_read_fd( pipe, DOWN ) );
+    } else {
+        // Close writing down and reading up
+        close( nxai_pipe_get_write_fd( pipe, DOWN ) );
+        close( nxai_pipe_get_read_fd( pipe, UP ) );
     }
 }
 

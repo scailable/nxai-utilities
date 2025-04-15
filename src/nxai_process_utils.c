@@ -57,7 +57,7 @@ uint64_t nxai_current_timestamp_us() {
     return microseconds;
 }
 
-void nxai_initialise_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix, bool log_to_console, bool log_to_file, int log_verbosity_level ) {
+void nxai_initialize_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix, bool log_to_console, bool log_to_file, int log_verbosity_level ) {
     _start_log_filepath = strdup( start_log_filepath );
     _rotating_log_filepath = strdup( rotating_log_filepath );
     _log_prefix = strdup( log_prefix );
@@ -85,12 +85,10 @@ void nxai_initialise_logging( const char *start_log_filepath, const char *rotati
 }
 
 void nxai_finalise_logging() {
-#ifndef NXAI_DEBUG
     free( _start_log_filepath );
     free( _rotating_log_filepath );
     free( _log_prefix );
     free( _old_logfile_path );
-#endif
     if ( start_logfile_full == false ) {
         fclose( start_logfile );
     }
