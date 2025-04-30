@@ -6,13 +6,26 @@ extern "C" {
 
 #include <stdbool.h>
 #include <stdint.h>
+
+#if defined( __WIN32__ )
+// Windows stuff
+#include "windows.h"
+#else
 #include <sys/shm.h>
 #include <sys/types.h>
+#endif
 
+#if defined( __WIN32__ )
+typedef struct {
+    HANDLE up_pipe[2];
+    HANDLE down_pipe[2];
+} bidirectional_pipe_t;
+#else
 typedef struct bidirectional_pipe_t {
     int up_pipe[2];
     int down_pipe[2];
 } bidirectional_pipe_t;
+#endif
 
 typedef enum {
     UP = 1,

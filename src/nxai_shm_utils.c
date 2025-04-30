@@ -21,14 +21,18 @@
 #include <time.h>
 #endif
 
+#if defined( __WIN32__ )
+// Windows stuff
+#include "windows.h"
+#else
 // Pipe stuff
-#include <sys/select.h>
-
-// SHM stuff
-#include <fcntl.h>
 #include <sys/select.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
+#endif
+
+// SHM stuff
+#include <fcntl.h>
 
 #define HEADER_BYTES 4
 
@@ -46,6 +50,40 @@ bidirectional_pipe_t nxai_initialize_pipe( int up_pipe_read, int up_pipe_write, 
 }
 
 bidirectional_pipe_t nxai_create_pipe( int *error ) {
+#if defined( __WIN32__ )
+    // Windows implementation
+    bidirectional_pipe_t created_pipe = { { INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE },
+                                          { INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE } };
+
+    SECURITY_ATTRIBUTES saAttr;
+    saAttr.nLength = sizeof( SECURITY_ATTRIBUTES );
+    saAttr.bInheritHandle = TRUE;
+    saAttr.lpSecurityDescriptor = NULL;
+
+    // Create up pipe
+    if ( !CreatePipe( &created_pipe.up_pipe.read_handle,
+                      &created_pipe.up_pipe.write_handle,
+                      &saAttr,
+                      0 ) ) {
+        *error = -1;
+        return created_pipe;
+    }
+
+    // Create down pipe
+    if ( !CreatePipe( &created_pipe.down_pipe.read_handle,
+                      &created_pipe.down_pipe.write_handle,
+                      &saAttr,
+                      0 ) ) {
+        CloseHandle( created_pipe.up_pipe.read_handle );
+        CloseHandle( created_pipe.up_pipe.write_handle );
+        *error = -2;
+        return created_pipe;
+    }
+
+    *error = 0;
+    return created_pipe;
+#else
+    // Linux implementation
     bidirectional_pipe_t created_pipe = { { -1, -1 }, { -1, -1 } };
 
     // Create up pipe
@@ -64,9 +102,23 @@ bidirectional_pipe_t nxai_create_pipe( int *error ) {
 
     *error = 0;
     return created_pipe;
+#endif
 }
 
 char nxai_pipe_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction ) {
+#if defined( __WIN32__ )
+    // Windows implementation
+    char buffer;
+    DWORD bytes_read;
+    if ( !ReadFile( nxai_pipe_get_read_fd( pipe_fd, direction ), &buffer, 1, &bytes_read, NULL ) ) {
+        return -1;
+    }
+    if ( bytes_read == 0 ) {
+        return -4;
+    }
+    return buffer;
+#else
+    // Linux implementation
     char buffer;
     ssize_t bytes_read;
 
@@ -80,13 +132,43 @@ char nxai_pipe_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction ) {
     }
 
     return buffer;
+#endif
 }
 
 ssize_t nxai_pipe_send( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction, char signal ) {
+#if defined( __WIN32__ )
+    // Windows implementation
+    DWORD bytes_written;
+    if ( !WriteFile( nxai_pipe_get_write_fd( pipe_fd, direction ), &signal, 1, &bytes_written, NULL ) ) {
+        return -1;
+    }
+    return bytes_written;
+#else
+    // Linux implementation
     return write( nxai_pipe_get_write_fd( pipe_fd, direction ), &signal, 1 );
+#endif
 }
 
 char nxai_pipe_timed_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction, int timeout ) {
+#if defined( __WIN32__ )
+    // Windows implementation
+    char buffer;
+    DWORD bytes_read;
+    DWORD start_time = GetTickCount();
+
+    while ( GetTickCount() - start_time < timeout * 1000 ) {
+        if ( !ReadFile( nxai_pipe_get_read_fd( pipe_fd, direction ), &buffer, 1, &bytes_read, NULL ) ) {
+            return -1;
+        }
+        if ( bytes_read > 0 ) {
+            return buffer;
+        }
+
+        Sleep( 100 );// Prevent busy waiting
+    }
+    return -3;
+#else
+    // Linux implementation
     char buffer;
     fd_set read_fds;
     struct timeval tv;
@@ -114,9 +196,22 @@ char nxai_pipe_timed_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION directio
         return -4;
     }
     return buffer;
+#endif
 }
 
 void nxai_pipe_close( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
+#if defined( __WIN32__ )
+    // Windows implementation
+    if ( direction == DOWN ) {
+        CloseHandle( nxai_pipe_get_write_fd( pipe, UP ) );
+        CloseHandle( nxai_pipe_get_read_fd( pipe, DOWN ) );
+    } else {
+        CloseHandle( nxai_pipe_get_write_fd( pipe, DOWN ) );
+        CloseHandle( nxai_pipe_get_read_fd( pipe, UP ) );
+    }
+#else
+    // Linux implementation
+
     if ( direction == DOWN ) {
         // Close writing up and reading down
         close( nxai_pipe_get_write_fd( pipe, UP ) );
@@ -126,6 +221,7 @@ void nxai_pipe_close( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
         close( nxai_pipe_get_write_fd( pipe, DOWN ) );
         close( nxai_pipe_get_read_fd( pipe, UP ) );
     }
+#endif
 }
 
 key_t nxai_shm_create_random( size_t size, int *shm_id ) {
