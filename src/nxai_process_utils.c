@@ -2,9 +2,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <pthread.h>
 #include <signal.h>
-#include <spawn.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -12,11 +10,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <time.h>
+#include <unistd.h>
+
+#if defined( __WIN32__ )
+// Windows specific imports
+#include <handleapi.h>
+#include <ioapiset.h>
+#include <processthreadsapi.h>
+#include <synchapi.h>
+#include <windows.h>
+#else
+// Linux specific imports
+#include <spawn.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/wait.h>
-#include <time.h>
-#include <unistd.h>
+#endif
 
 #ifdef NXAI_DEBUG
 #include "memory_leak_detector.h"
@@ -242,6 +252,73 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
 }
 
 pid_t nxai_start_process( char *const argv[], bool connect_console, int *stderr_pipe ) {
+#if defined( __WIN32__ )
+    // Windows implementation
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+    SECURITY_ATTRIBUTES saAttr;
+    HANDLE hStdErrRd = NULL;
+    HANDLE hStdErrWr = NULL;
+
+    // Initialize structures
+    ZeroMemory( &si, sizeof( si ) );
+    si.cb = sizeof( si );
+    ZeroMemory( &pi, sizeof( pi ) );
+
+    // Set up security attributes for pipes
+    saAttr.nLength = sizeof( SECURITY_ATTRIBUTES );
+    saAttr.bInheritHandle = TRUE;
+    saAttr.lpSecurityDescriptor = NULL;
+
+    // Create stderr pipe
+    if ( !CreatePipe( &hStdErrRd, &hStdErrWr, &saAttr, 0 ) ) {
+        return 1;// Error creating pipe
+    }
+
+    // Set pipe handles to non-blocking mode
+    DWORD dwMode = PIPE_READMODE_MESSAGE | PIPE_WAIT;
+    SetNamedPipeHandleState( hStdErrRd, &dwMode, NULL, NULL );
+
+    // Set up startup info
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdError = hStdErrWr;
+
+    // Redirect stdout to NUL if console connection is false
+    if ( !connect_console ) {
+        HANDLE hNull = CreateFileA( "NUL", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                                    FILE_ATTRIBUTE_NORMAL, NULL );
+        if ( hNull == INVALID_HANDLE_VALUE ) {
+            CloseHandle( hStdErrWr );
+            CloseHandle( hStdErrRd );
+            return 1;
+        }
+        si.hStdOutput = hNull;
+    } else {
+        si.hStdOutput = GetStdHandle( STD_OUTPUT_HANDLE );
+    }
+
+    // Start process
+    if ( !CreateProcess( NULL, argv[0], NULL, NULL, TRUE,
+                         CREATE_NO_WINDOW | NORMAL_PRIORITY_CLASS,
+                         NULL, NULL, &si, &pi ) ) {
+        CloseHandle( hStdErrWr );
+        CloseHandle( hStdErrRd );
+        if ( !connect_console && hNull != INVALID_HANDLE_VALUE ) {
+            CloseHandle( hNull );
+        }
+        return 1;
+    }
+
+    // Cleanup
+    CloseHandle( hStdErrWr );
+    if ( !connect_console && hNull != INVALID_HANDLE_VALUE ) {
+        CloseHandle( hNull );
+    }
+
+    *stderr_pipe = _open_osfhandle( (intptr_t) hStdErrRd, _O_RDONLY | _O_BINARY );
+    return pi.dwProcessId;
+#else
+    // Linux implementation
     pid_t child_pid;
     int cerr_pipe[2];
 
@@ -276,6 +353,7 @@ pid_t nxai_start_process( char *const argv[], bool connect_console, int *stderr_
     *stderr_pipe = cerr_pipe[0];
 
     return child_pid;
+#endif
 }
 
 static void sigchld_handler( int signum ) {
@@ -284,6 +362,35 @@ static void sigchld_handler( int signum ) {
 }
 
 int waitpid_timeout( pid_t process_id, int timeout_seconds ) {
+#if defined( __WIN32__ )
+    // Windows implementation
+    HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_TERMINATE,
+                                   FALSE, process_id );
+
+    if ( hProcess == NULL ) {
+        return -1;
+    }
+
+    DWORD waitResult = WaitForSingleObject( hProcess, timeout_seconds * 1000 );
+
+    switch ( waitResult ) {
+        case WAIT_OBJECT_0: {
+            DWORD exitCode;
+            GetExitCodeProcess( hProcess, &exitCode );
+            CloseHandle( hProcess );
+            return exitCode;
+        }
+        case WAIT_TIMEOUT: {
+            TerminateProcess( hProcess, 1 );
+            CloseHandle( hProcess );
+            return -1;
+        }
+        default:
+            CloseHandle( hProcess );
+            return -1;
+    }
+#else
+    // Linux implementation
     struct sigaction sa;
     sigset_t mask;
 
@@ -326,4 +433,5 @@ int waitpid_timeout( pid_t process_id, int timeout_seconds ) {
         // Error in sigtimedwait
         return -1;
     }
+#endif
 }

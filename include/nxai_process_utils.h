@@ -4,7 +4,19 @@
 extern "C" {
 #endif
 
+#if defined( __WIN32__ )
+// Windows specific imports
+#include <handleapi.h>
+#include <ioapiset.h>
+#include <processthreadsapi.h>
+#include <synchapi.h>
+#include <windows.h>
+#else
+// Linux specific imports
 #include <spawn.h>
+#endif
+
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
