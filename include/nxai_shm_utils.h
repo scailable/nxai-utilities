@@ -20,11 +20,19 @@ typedef struct {
     HANDLE up_pipe[2];
     HANDLE down_pipe[2];
 } bidirectional_pipe_t;
+typedef struct {
+    wchar_t key[50];
+    HANDLE id;
+} nxai_shm_t;
 #else
 typedef struct bidirectional_pipe_t {
     int up_pipe[2];
     int down_pipe[2];
 } bidirectional_pipe_t;
+typedef struct {
+    key_t key;
+    int id;
+} nxai_shm_t;
 #endif
 
 typedef enum {
@@ -48,50 +56,16 @@ void nxai_pipe_close( bidirectional_pipe_t pipe, PIPE_DIRECTION direction );
 
 ssize_t nxai_pipe_send( bidirectional_pipe_t pipe, PIPE_DIRECTION direction, char signal );
 
-key_t nxai_shm_create_random( size_t size, int *shm_id );
+nxai_shm_t nxai_shm_create_random( size_t size );
 
-/**
- * @brief Retrieves a shared memory segment.
- *
- * This function retrieves a shared memory segment with a given key.
- * If the retrieval fails, it prints an error message.
- *
- * @param shm_key The key of the shared memory segment.
- * @return The id of the shared memory segment.
- */
-int nxai_shm_get( key_t shm_key );
+nxai_shm_t nxai_shm_get( nxai_shm_t shm_data );
 
-void *nxai_shm_attach( int shm_id );
+void *nxai_shm_attach( nxai_shm_t shm );
 
 void nxai_shm_write_to_attached( void *shm_buffer, const char *data, uint32_t size );
 
-/**
- * @brief Creates a shared memory segment.
- *
- * This function generates a shared memory segment with the specified size.
- * It uses the ftok function to generate a unique key for the shared memory segment
- * and the shmget function to create the shared memory segment.
- *
- * @param path The pathname to be used in generating the key.
- * @param project_id The project identifier to be used in generating the key.
- * @param size The size of the shared memory segment to be created.
- * @param shm_id A pointer to an integer where the shared memory segment ID will be stored.
- *
- * @return The key used to create the shared memory segment.
- */
-key_t nxai_shm_create( char *path, int project_id, size_t size, int *shm_id );
+nxai_shm_t nxai_shm_create( const char *path, int project_id, size_t size );
 
-/**
- * @brief Writes data to a shared memory segment.
- *
- * This function attaches a shared memory segment to the process's address space, writes the size of the data and the data itself to the shared memory segment, and then detaches the shared memory segment from the process's address space.
- *
- * @param shm_id The ID of the shared memory segment.
- * @param data The data to be written to the shared memory segment.
- * @param size The size of the data to be written to the shared memory segment.
- *
- * @note This function does not check if the shared memory segment is large enough to hold the data. It is the responsibility of the caller to ensure this.
- */
 bool nxai_shm_write( int shm_id, const char *data, uint32_t size );
 
 void nxai_shm_read_from_attached( void *shm_pointer, size_t *data_length, char **payload_data );
@@ -148,7 +122,7 @@ int nxai_shm_destroy( int shm_id );
  *
  * \return The identifier of the new shared memory if successful, -1 if the old shared memory cannot be destroyed.
  */
-int nxai_shm_realloc( key_t shm_key, int old_shm_id, size_t new_size );
+int nxai_shm_realloc( nxai_shm_key_t shm_key, int old_shm_id, size_t new_size );
 
 /**
  * @brief Get the size of shared memory segment
