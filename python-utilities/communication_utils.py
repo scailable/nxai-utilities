@@ -8,9 +8,7 @@ import sysv_ipc as ipc
 import msgpack
 
 
-def patchSettings(
-    settings_contents: dict, uiprovider_url="http://127.0.0.1:8081"
-) -> bool:
+def patchSettings(settings_contents: dict, uiprovider_url="http://127.0.0.1:8081") -> bool:
     """
     This function sends a PATCH request to update settings on a UI provider.
 
@@ -29,9 +27,7 @@ def patchSettings(
         response = requests.patch(uiprovider_url + "/settings", data=settings_contents)
         response.raise_for_status()  # Raise an exception if the response indicates an unsuccessful status code (non-2xx)
     except requests.exceptions.Timeout:
-        print(
-            "Request timed out"
-        )  # If the request times out, print an error message and return False
+        print("Request timed out")  # If the request times out, print an error message and return False
         return False
     except requests.exceptions.RequestException as e:
         # If there is a different request exception, print the error message and return False
@@ -80,6 +76,9 @@ def startUnixSocketServer(
 
     # Bind the socket to the path
     server.bind(socket_path)
+
+    # Set open permissions for socket file so that any process can connect
+    os.chmod(socket_path, 0o777)
 
     # Listen for incoming connections
     server.listen(1)
@@ -176,9 +175,7 @@ def sendMessageOverConnection(connection: socket.socket, message: bytes):
     connection.sendall(message)
 
 
-def sendSocketMessage(
-    message: str, sclbl_input_socket_path: str = "/opt/sclbl/sockets/sclblmod.sock"
-):
+def sendSocketMessage(message: str, sclbl_input_socket_path: str = "/opt/sclbl/sockets/sclblmod.sock"):
     """
     Sends a message through a socket connection to a specified Unix socket path.
 
@@ -304,9 +301,7 @@ def executeGetRequest(url, timeout=10):
         response.raise_for_status()  # raise exception for non-2xx status codes
         return response
     except requests.exceptions.Timeout:
-        raise Exception(
-            f"No response from Edge AI Manager after {timeout} seconds. \n URL: {url}"
-        )
+        raise Exception(f"No response from Edge AI Manager after {timeout} seconds. \n URL: {url}")
     except requests.exceptions.RequestException as e:
         raise Exception(f"Request error: {e}. \n URL: {url}")
 
@@ -390,9 +385,7 @@ def parseInferenceResults(message: bytes) -> dict:
     parsed_response = msgpack.unpackb(message)
     if "BBoxes_xyxy" in parsed_response:
         for key, value in parsed_response["BBoxes_xyxy"].items():
-            parsed_response["BBoxes_xyxy"][key] = list(
-                struct.unpack("f" * int(len(value) / 4), value)
-            )
+            parsed_response["BBoxes_xyxy"][key] = list(struct.unpack("f" * int(len(value) / 4), value))
     if "Identity" in parsed_response:
         parsed_response["Identity"] = list(
             struct.unpack(
@@ -408,8 +401,6 @@ def writeInferenceResults(object: dict) -> bytes:
         for key, value in object["BBoxes_xyxy"].items():
             object["BBoxes_xyxy"][key] = struct.pack("f" * len(value), *value)
     if "Identity" in object:
-        object["Identity"] = struct.pack(
-            "f" * len(object["Identity"]), object["Identity"]
-        )
+        object["Identity"] = struct.pack("f" * len(object["Identity"]), object["Identity"])
     message_bytes = msgpack.packb(object)
     return message_bytes
