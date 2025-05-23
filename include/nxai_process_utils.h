@@ -12,7 +12,7 @@ extern "C" {
 #include <synchapi.h>
 #include <windows.h>
 typedef HANDLE nxai_pipe_t;
-typedef HANDLE nxai_process_t;
+typedef DWORD nxai_process_t;
 #else
 typedef int nxai_pipe_t;
 typedef pid_t nxai_process_t;
@@ -46,6 +46,14 @@ void nxai_vlog( const char *fmt, ... );
 nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxai_pipe_t *stderr_pipe );
 
 int waitpid_timeout( pid_t process_id, int timeout_seconds );
+
+char *nxai_read_pipe_to_string( nxai_pipe_t pipe );
+
+int nxai_kill_process( nxai_process_t process );
+
+bool nxai_check_process_status( nxai_process_t process, int *status );
+
+bool nxai_process_started( nxai_process_t process );
 
 #ifdef __cplusplus
 }

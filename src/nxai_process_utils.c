@@ -53,6 +53,8 @@ pthread_mutex_t rotating_logfile_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void nxai_vvlog( const char *fmt, va_list *args );
 
+bool nxai_process_started( nxai_process_t process );
+
 uint64_t nxai_current_timestamp_ms() {
 #if defined( __WIN32__ )
     // Windows implementation
@@ -283,6 +285,21 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
     }
 }
 
+bool nxai_process_started( nxai_process_t process ) {
+#if defined( __WIN32__ )
+    // Windows implementation
+    if ( process == 1 ) {
+        return false;
+    }
+#else
+    // Linux implementation
+    if ( process == 1 ) {
+        return false;
+    }
+#endif
+    return true;
+}
+
 nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxai_pipe_t *stderr_pipe ) {
 #if defined( __WIN32__ )
     // Windows implementation
@@ -294,7 +311,7 @@ nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxa
 
     HANDLE hReadPipe, hWritePipe;
     if ( !CreatePipe( &hReadPipe, &hWritePipe, &saAttr, 0 ) ) {
-        return INVALID_HANDLE_VALUE;
+        return 1;
     }
 
     // Set read end to non-blocking mode
@@ -302,7 +319,7 @@ nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxa
     if ( !SetNamedPipeHandleState( hReadPipe, &dwFlagsAndAttributes, NULL, NULL ) ) {
         CloseHandle( hReadPipe );
         CloseHandle( hWritePipe );
-        return INVALID_HANDLE_VALUE;
+        return 1;
     }
 
     STARTUPINFOW si;
@@ -327,7 +344,7 @@ nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxa
                           NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi ) ) {
         CloseHandle( hReadPipe );
         CloseHandle( hWritePipe );
-        return INVALID_HANDLE_VALUE;
+        return 1;
     }
 
     // Cleanup
@@ -335,7 +352,7 @@ nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxa
     *stderr_pipe = hReadPipe;
     CloseHandle( pi.hThread );
 
-    return pi.hProcess;
+    return pi.dwProcessId;
 #else
     // Linux implementation
     pid_t child_pid;
@@ -451,6 +468,97 @@ int waitpid_timeout( pid_t process_id, int timeout_seconds ) {
     } else {
         // Error in sigtimedwait
         return -1;
+    }
+#endif
+}
+
+char *nxai_read_pipe_to_string( nxai_pipe_t pipe ) {
+    char *out_string = (char *) malloc( 1024 );
+    size_t total_bytes_read = 0;
+    char buffer[1024];
+#if defined( __WIN32__ )
+    // Windows implementation
+    DWORD bytes_read;
+    while ( ( bytes_read = ReadFile( pipe, buffer, sizeof( buffer ), &bytes_read, NULL ) ) > 0 ) {
+        out_string = realloc( out_string, total_bytes_read + bytes_read );
+        memcpy( out_string + total_bytes_read, buffer, bytes_read );
+        total_bytes_read += bytes_read;
+    }
+#else
+    // Linux implementation
+    ssize_t bytes_read;
+    while ( ( bytes_read = read( pipe, buffer, sizeof( buffer ) ) ) > 0 ) {
+        out_string = realloc( out_string, total_bytes_read + bytes_read );
+        memcpy( out_string + total_bytes_read, buffer, bytes_read );
+        total_bytes_read += bytes_read;
+    }
+#endif
+    return out_string;
+}
+
+int nxai_kill_process( nxai_process_t process ) {
+#if defined( __WIN32__ )
+    // Windows implementation
+    // Get handle to process with full permissions
+    HANDLE hProcess = OpenProcess( PROCESS_TERMINATE | PROCESS_QUERY_INFORMATION,
+                                   FALSE, process );
+
+    if ( hProcess == NULL ) {
+        return 0;// Process wasn't running
+    }
+
+    // Try graceful shutdown first (equivalent to SIGTERM)
+    if ( !PostMessage( FindWindow( NULL, NULL ), WM_CLOSE, 0, 0 ) ) {
+        // Fall back to force termination if windowless process
+        TerminateProcess( hProcess, 0 );
+    }
+
+    DWORD status;
+    GetExitCodeProcess( hProcess, &status );
+
+    CloseHandle( hProcess );
+#else
+    // Linux implementation
+    // Send SIGTERM to the process
+    int result = kill( pid, SIGTERM );
+    if ( result == -1 ) {
+        // Process wasn't running. Consider not running
+        return 0;
+    }
+
+    // Wait for the child process to finish
+    int status;
+    waitpid( pid, &status, 0 );
+
+#endif
+    nxai_vlog( "Module finished with status: %d\n", status );
+    return status;
+}
+
+bool nxai_check_process_status( nxai_process_t process, int *status ) {
+#if defined( __WIN32__ )
+    // Windows implementation
+    HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION,
+                                   FALSE, process );
+
+    if ( hProcess == NULL ) {
+        return false;
+    }
+
+    DWORD exitCode;
+    if ( GetExitCodeProcess( hProcess, &exitCode ) ) {
+        *status = exitCode;
+    }
+    CloseHandle( hProcess );
+    return exitCode == STILL_ACTIVE;
+#else
+    // Linux implementation
+    int result = waitpid( pid, status, WNOHANG );
+    if ( result == 0 ) {
+        return true;
+    } else {
+        *status = WEXITSTATUS( *status );
+        return false;
     }
 #endif
 }

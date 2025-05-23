@@ -7,25 +7,28 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
+// Platform imports
 #if defined( __WIN32__ )
-// Windows stuff
 #include "windows.h"
 #else
 #include <sys/shm.h>
 #include <sys/types.h>
 #endif
 
+// Platform types
 #if defined( __WIN32__ )
 typedef HANDLE nxai_pipe_t;
+typedef HANDLE shm_id_t;
 typedef struct {
     wchar_t key[MAX_PATH];
-    HANDLE id;
+    shm_id_t id;
 } nxai_shm_t;
 #else
 typedef int nxai_pipe_t;
+typedef int shm_id_t;
 typedef struct {
     key_t key;
-    int id;
+    shm_id_t id;
 } nxai_shm_t;
 #endif
 
