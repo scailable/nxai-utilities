@@ -11,7 +11,11 @@ extern "C" {
 #include <processthreadsapi.h>
 #include <synchapi.h>
 #include <windows.h>
+typedef HANDLE nxai_pipe_t;
+typedef HANDLE nxai_process_t;
 #else
+typedef int nxai_pipe_t;
+typedef pid_t nxai_process_t;
 // Linux specific imports
 #include <spawn.h>
 #endif
@@ -39,7 +43,7 @@ void nxai_vlog_verbose( const char *fmt, ... );
 
 void nxai_vlog( const char *fmt, ... );
 
-pid_t nxai_start_process( char *const argv[], bool connect_console, int *stderr_pipe );
+nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxai_pipe_t *stderr_pipe );
 
 int waitpid_timeout( pid_t process_id, int timeout_seconds );
 

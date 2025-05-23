@@ -43,7 +43,7 @@ char *_old_logfile_path = NULL;
 static uint64_t last_timestamp = 0;
 size_t logfile_max_size_mb = 10;
 static bool start_logfile_full = false;
-static int logfile_last_size = -1;
+static size_t logfile_last_size = 0;
 static bool _log_to_console = false;
 static bool _log_to_file = true;
 static int _log_verbosity_level = 1;
@@ -54,17 +54,47 @@ pthread_mutex_t rotating_logfile_lock = PTHREAD_MUTEX_INITIALIZER;
 static void nxai_vvlog( const char *fmt, va_list *args );
 
 uint64_t nxai_current_timestamp_ms() {
+#if defined( __WIN32__ )
+    // Windows implementation
+    FILETIME ft;
+    ULARGE_INTEGER ui;
+
+    GetSystemTimeAsFileTime( &ft );
+    ui.LowPart = ft.dwLowDateTime;
+    ui.HighPart = ft.dwHighDateTime;
+
+    // Convert from 100ns intervals to milliseconds
+    const uint64_t HUNDRED_NANOSECONDS_TO_MILLISECONDS = 10000;
+    return ui.QuadPart / HUNDRED_NANOSECONDS_TO_MILLISECONDS;
+#else
+    // Linux implementation
     struct timeval te;
     gettimeofday( &te, NULL );                                    // get current time
     int64_t milliseconds = te.tv_sec * 1000LL + te.tv_usec / 1000;// calculate milliseconds
     return milliseconds;
+#endif
 }
 
 uint64_t nxai_current_timestamp_us() {
+#if defined( __WIN32__ )
+    // Windows implementation
+    FILETIME ft;
+    ULARGE_INTEGER ui;
+
+    GetSystemTimeAsFileTime( &ft );
+    ui.LowPart = ft.dwLowDateTime;
+    ui.HighPart = ft.dwHighDateTime;
+
+    // Convert from 100ns intervals to microseconds
+    const uint64_t HUNDRED_NANOSECONDS_TO_MICROSECONDS = 10;
+    return ui.QuadPart / HUNDRED_NANOSECONDS_TO_MICROSECONDS;
+#else
+    // Linux implementation
     struct timeval te;
     gettimeofday( &te, NULL );// get current time
     int64_t microseconds = te.tv_sec * 1000000LL + te.tv_usec;
     return microseconds;
+#endif
 }
 
 void nxai_initialize_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix, bool log_to_console, bool log_to_file, int log_verbosity_level ) {
@@ -121,6 +151,38 @@ void nxai_vlog( const char *fmt, ... ) {
     va_end( args );
 }
 
+bool nxai_get_file_size( const char *filepath, size_t *file_size ) {
+#if defined( __WIN32__ )
+    // Windows specific implementation
+    WIN32_FIND_DATA fileData;
+    HANDLE hFile = FindFirstFile( filepath, &fileData );
+
+    if ( hFile != INVALID_HANDLE_VALUE ) {
+        *file_size = (size_t) fileData.nFileSizeLow;
+        FindClose( hFile );
+        return true;
+    } else {
+        printf( "An unexpected error occurred accessing log file: %s %s\n", filepath, strerror( errno ) );
+        return false;
+    }
+
+#else
+    // Linux specific implementation
+    struct stat file_stat;
+    if ( stat( _start_log_filepath, &file_stat ) < 0 ) {
+        switch ( errno ) {
+            case EACCES:// Permission denied
+                printf( "Permission denied trying to open logfile: %s.\n", filepath );
+            default:
+                printf( "An unexpected error occurred accessing log file: %s %s\n", filepath, strerror( errno ) );
+        }
+        return false;
+    }
+    *file_size = file_stat.st_size;
+    return true;
+#endif
+}
+
 static void nxai_vvlog( const char *fmt, va_list *args ) {
 
     if ( _log_verbosity_level == 0 || ( _log_to_file == false && _log_to_console == false ) ) {
@@ -162,49 +224,19 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
 
     // Determine which file to log to
     if ( start_logfile_full == false ) {
-        struct stat file_stat;
-        if ( logfile_last_size == -1 ) {
-            if ( stat( _start_log_filepath, &file_stat ) < 0 ) {
-                switch ( errno ) {
-                    case EACCES:// Permission denied
-                        printf( "Permission denied trying to open logfile: %s.\n", _start_log_filepath );
-                        break;
-                    default:
-                        printf( "An unexpected error occurred accessing log file: %s %s\n", _start_log_filepath, strerror( errno ) );
-                        break;
-                }
-                return;
-            }
-            logfile_last_size = file_stat.st_size;
-        }
         // Check if start logfile is full
         if ( (size_t) logfile_last_size < logfile_max_size_mb * 1000000 ) {
             // Write to start_log
             flogfile = start_logfile;
         } else {
             start_logfile_full = true;
-            logfile_last_size = -1;
+            logfile_last_size = 0;
             fclose( start_logfile );
         }
     }
 
     if ( flogfile == NULL ) {
         // Start logfile was full, open rotating logfile
-        struct stat file_stat;
-        if ( logfile_last_size == -1 ) {
-            if ( stat( _rotating_log_filepath, &file_stat ) < 0 ) {
-                switch ( errno ) {
-                    case EACCES:// Permission denied
-                        printf( "Permission denied trying to open logfile: %s.\n", _rotating_log_filepath );
-                        break;
-                    default:
-                        printf( "An unexpected error occurred accessing log file: %s %s\n", _rotating_log_filepath, strerror( errno ) );
-                        break;
-                }
-                return;
-            }
-            logfile_last_size = file_stat.st_size;
-        }
         pthread_mutex_lock( &rotating_logfile_lock );
         if ( (size_t) logfile_last_size > logfile_max_size_mb * 1000000 ) {
             // Rotating logfile is full, rename to ".old"
@@ -251,72 +283,59 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
     }
 }
 
-pid_t nxai_start_process( char *const argv[], bool connect_console, int *stderr_pipe ) {
+nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxai_pipe_t *stderr_pipe ) {
 #if defined( __WIN32__ )
     // Windows implementation
-    STARTUPINFO si;
-    PROCESS_INFORMATION pi;
+    // Create pipe for stderr redirection
     SECURITY_ATTRIBUTES saAttr;
-    HANDLE hStdErrRd = NULL;
-    HANDLE hStdErrWr = NULL;
-
-    // Initialize structures
-    ZeroMemory( &si, sizeof( si ) );
-    si.cb = sizeof( si );
-    ZeroMemory( &pi, sizeof( pi ) );
-
-    // Set up security attributes for pipes
     saAttr.nLength = sizeof( SECURITY_ATTRIBUTES );
     saAttr.bInheritHandle = TRUE;
     saAttr.lpSecurityDescriptor = NULL;
 
-    // Create stderr pipe
-    if ( !CreatePipe( &hStdErrRd, &hStdErrWr, &saAttr, 0 ) ) {
-        return 1;// Error creating pipe
+    HANDLE hReadPipe, hWritePipe;
+    if ( !CreatePipe( &hReadPipe, &hWritePipe, &saAttr, 0 ) ) {
+        return INVALID_HANDLE_VALUE;
     }
 
-    // Set pipe handles to non-blocking mode
-    DWORD dwMode = PIPE_READMODE_MESSAGE | PIPE_WAIT;
-    SetNamedPipeHandleState( hStdErrRd, &dwMode, NULL, NULL );
+    // Set read end to non-blocking mode
+    DWORD dwFlagsAndAttributes = FILE_FLAG_OVERLAPPED;
+    if ( !SetNamedPipeHandleState( hReadPipe, &dwFlagsAndAttributes, NULL, NULL ) ) {
+        CloseHandle( hReadPipe );
+        CloseHandle( hWritePipe );
+        return INVALID_HANDLE_VALUE;
+    }
 
-    // Set up startup info
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdError = hStdErrWr;
+    STARTUPINFOW si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory( &si, sizeof( si ) );
+    ZeroMemory( &pi, sizeof( pi ) );
 
-    // Redirect stdout to NUL if console connection is false
+    si.cb = sizeof( si );
+
     if ( !connect_console ) {
-        HANDLE hNull = CreateFileA( "NUL", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-                                    FILE_ATTRIBUTE_NORMAL, NULL );
-        if ( hNull == INVALID_HANDLE_VALUE ) {
-            CloseHandle( hStdErrWr );
-            CloseHandle( hStdErrRd );
-            return 1;
-        }
-        si.hStdOutput = hNull;
-    } else {
-        si.hStdOutput = GetStdHandle( STD_OUTPUT_HANDLE );
+        // Redirect stdout to NUL (Windows equivalent of /dev/null)
+        si.dwFlags |= STARTF_USESTDHANDLES;
+        si.hStdOutput = INVALID_HANDLE_VALUE;
     }
 
-    // Start process
-    if ( !CreateProcess( NULL, argv[0], NULL, NULL, TRUE,
-                         CREATE_NO_WINDOW | NORMAL_PRIORITY_CLASS,
-                         NULL, NULL, &si, &pi ) ) {
-        CloseHandle( hStdErrWr );
-        CloseHandle( hStdErrRd );
-        if ( !connect_console && hNull != INVALID_HANDLE_VALUE ) {
-            CloseHandle( hNull );
-        }
-        return 1;
+    // Setup stderr redirection
+    si.dwFlags |= STARTF_USESTDHANDLES;
+    si.hStdError = hWritePipe;
+
+    // Create the process
+    if ( !CreateProcessW( NULL, (wchar_t *) ( argv[0] ),
+                          NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi ) ) {
+        CloseHandle( hReadPipe );
+        CloseHandle( hWritePipe );
+        return INVALID_HANDLE_VALUE;
     }
 
     // Cleanup
-    CloseHandle( hStdErrWr );
-    if ( !connect_console && hNull != INVALID_HANDLE_VALUE ) {
-        CloseHandle( hNull );
-    }
+    CloseHandle( hWritePipe );// Child inherits this handle
+    *stderr_pipe = hReadPipe;
+    CloseHandle( pi.hThread );
 
-    *stderr_pipe = _open_osfhandle( (intptr_t) hStdErrRd, _O_RDONLY | _O_BINARY );
-    return pi.dwProcessId;
+    return pi.hProcess;
 #else
     // Linux implementation
     pid_t child_pid;
