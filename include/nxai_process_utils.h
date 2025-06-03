@@ -16,13 +16,13 @@ typedef DWORD nxai_process_t;
 typedef HANDLE nxai_thread_t;
 typedef HANDLE nxai_mutex_t;
 #else
-typedef int nxai_pipe_t;
-typedef pid_t nxai_process_t;
-typedef thread_t nxai_thread_t;
-typedef pthread_mutex_t nxai_mutex_t;
 // Linux specific imports
 #include <spawn.h>
 #include <pthread.h>
+typedef int nxai_pipe_t;
+typedef pid_t nxai_process_t;
+typedef pthread_t nxai_thread_t;
+typedef pthread_mutex_t nxai_mutex_t;
 #endif
 
 #include <stdarg.h>

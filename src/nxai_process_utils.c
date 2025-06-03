@@ -521,7 +521,7 @@ int nxai_kill_process( nxai_process_t process ) {
 #else
     // Linux implementation
     // Send SIGTERM to the process
-    int result = kill( pid, SIGTERM );
+    int result = kill( process, SIGTERM );
     if ( result == -1 ) {
         // Process wasn't running. Consider not running
         return 0;
@@ -529,7 +529,7 @@ int nxai_kill_process( nxai_process_t process ) {
 
     // Wait for the child process to finish
     int status;
-    waitpid( pid, &status, 0 );
+    waitpid( process, &status, 0 );
 
 #endif
     nxai_vlog( "Module finished with status: %d\n", status );
@@ -554,7 +554,7 @@ bool nxai_check_process_status( nxai_process_t process, int *status ) {
     return exitCode == STILL_ACTIVE;
 #else
     // Linux implementation
-    int result = waitpid( pid, status, WNOHANG );
+    int result = waitpid( process, status, WNOHANG );
     if ( result == 0 ) {
         return true;
     } else {

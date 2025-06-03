@@ -124,7 +124,7 @@ char nxai_pipe_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction ) {
     char buffer;
     ssize_t bytes_read;
 
-    bytes_read = read( nxai_pipe_get_read_fd( pipe_fd, direction ), &buffer, 1 );
+    bytes_read = read( nxai_pipe_get_read_pipe( pipe_fd, direction ), &buffer, 1 );
     if ( bytes_read == -1 ) {
         return -1;
     }
@@ -147,7 +147,7 @@ ssize_t nxai_pipe_send( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction, 
     return bytes_written;
 #else
     // Linux implementation
-    return write( nxai_pipe_get_write_fd( pipe_fd, direction ), &signal, 1 );
+    return write( nxai_pipe_get_write_pipe( pipe_fd, direction ), &signal, 1 );
 #endif
 }
 
@@ -178,17 +178,17 @@ char nxai_pipe_timed_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION directio
 
     // Set up select parameters
     FD_ZERO( &read_fds );
-    FD_SET( nxai_pipe_get_read_fd( pipe_fd, direction ), &read_fds );
+    FD_SET( nxai_pipe_get_read_pipe( pipe_fd, direction ), &read_fds );
     tv.tv_sec = timeout;
     tv.tv_usec = 0;
 
     // Wait for data or timeout
-    if ( select( nxai_pipe_get_read_fd( pipe_fd, direction ) + 1, &read_fds, NULL, NULL, &tv ) <= 0 ) {
+    if ( select( nxai_pipe_get_read_pipe( pipe_fd, direction ) + 1, &read_fds, NULL, NULL, &tv ) <= 0 ) {
         return -3;
     }
 
     // Read data if available
-    bytes_read = read( nxai_pipe_get_read_fd( pipe_fd, direction ), &buffer, 1 );
+    bytes_read = read( nxai_pipe_get_read_pipe( pipe_fd, direction ), &buffer, 1 );
     if ( bytes_read == -1 ) {
         printf( "Error in read function during pipe timed read: %s\n", strerror( errno ) );
         return -1;
@@ -216,12 +216,12 @@ void nxai_pipe_close( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
 
     if ( direction == DOWN ) {
         // Close writing up and reading down
-        close( nxai_pipe_get_write_fd( pipe, UP ) );
-        close( nxai_pipe_get_read_fd( pipe, DOWN ) );
+        close( nxai_pipe_get_write_pipe( pipe, UP ) );
+        close( nxai_pipe_get_read_pipe( pipe, DOWN ) );
     } else {
         // Close writing down and reading up
-        close( nxai_pipe_get_write_fd( pipe, DOWN ) );
-        close( nxai_pipe_get_read_fd( pipe, UP ) );
+        close( nxai_pipe_get_write_pipe( pipe, DOWN ) );
+        close( nxai_pipe_get_read_pipe( pipe, UP ) );
     }
 #endif
 }
@@ -288,8 +288,8 @@ nxai_shm_t nxai_shm_create( const char *path, int project_id, size_t size ) {
 #else
     // Linux implementation
     key_t shm_key = ftok( path, project_id );
-    *shm_id = shmget( shm_key, size + HEADER_BYTES, 0666 | IPC_CREAT );
-    if ( *shm_id == -1 ) {
+    shm_id_t new_id = shmget( shm_key, size + HEADER_BYTES, 0666 | IPC_CREAT );
+    if ( new_id == -1 ) {
         perror( "Failed to create SHM:" );
     }
     return (nxai_shm_t) { .id = new_id, .key = shm_key };
@@ -303,8 +303,8 @@ bool nxai_shm_get_id( nxai_shm_t *shm ) {
     return true;
 #else
     // Linux implementation
-    shm->id = = shmget( shm_key, 0, 0 );
-    if ( shm_id == -1 ) {
+    shm->id = shmget( shm->key, 0, 0 );
+    if ( shm->id == -1 ) {
         printf( "Could not get SHM %d : %s\n", __LINE__, strerror( errno ) );
         return false;
     }
@@ -364,7 +364,7 @@ bool nxai_shm_write( const nxai_shm_t *shm, const char *data, uint32_t size ) {
     return true;
 #else
     // Linux implementation
-    void *shm_pointer = nxai_shm_attach( shm->id );
+    void *shm_pointer = nxai_shm_attach( *shm );
     if ( shm_pointer == (void *) -1 ) {
         return false;
     }
@@ -406,7 +406,7 @@ void *nxai_shm_read( nxai_shm_t *shm, size_t *data_length, char **payload_data )
     return view;
 #else
     // Linux implementation
-    void *shm_pointer = shmat( shm_id, NULL, 0 );
+    void *shm_pointer = shmat( shm->id, NULL, 0 );
     if ( shm_pointer == (void *) -1 ) {
         return NULL;
     }
@@ -434,7 +434,7 @@ int nxai_shm_destroy( const nxai_shm_t *shm ) {
     return result ? 0 : -1;
 #else
     // Linux implementation
-    return shmctl( shm_id, IPC_RMID, NULL );
+    return shmctl( shm->id, IPC_RMID, NULL );
 #endif
 }
 
@@ -460,7 +460,7 @@ bool nxai_shm_realloc( nxai_shm_t *shm, size_t new_size ) {
 #else
     // Linux implementation
     // Remove old SHM
-    if ( nxai_shm_destroy( shm->id ) != 0 ) {
+    if ( nxai_shm_destroy( shm ) != 0 ) {
         fprintf( stderr, "Error! Could not destroy Shared Memory segment with ID %d.\n", shm->id );
         return false;
     }

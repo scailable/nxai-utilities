@@ -37,6 +37,8 @@ bool nxai_socket_interrupt_signal = false;
 static struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
 
 // Helper function to convert Windows errors to errno values
+#if defined( __WIN32__ )
+// Windows implementation
 static int win32_error_to_errno( DWORD error ) {
     switch ( error ) {
         case ERROR_FILE_NOT_FOUND: return ENOENT;
@@ -49,6 +51,7 @@ static int win32_error_to_errno( DWORD error ) {
         default: return EINVAL;
     }
 }
+#endif
 
 int nxai_socket_initialize_sockets() {
 #if defined( __WIN32__ )
