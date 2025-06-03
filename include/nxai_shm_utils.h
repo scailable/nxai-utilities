@@ -9,6 +9,7 @@ extern "C" {
 
 // Platform imports
 #if defined( __WIN32__ )
+#include "winsock2.h"
 #include "windows.h"
 #else
 #include <sys/shm.h>

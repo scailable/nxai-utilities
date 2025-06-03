@@ -23,6 +23,7 @@
 
 #if defined( __WIN32__ )
 // Windows stuff
+#include "winsock2.h"
 #include "windows.h"
 // Windows equivalent of Linux shared memory header
 #else

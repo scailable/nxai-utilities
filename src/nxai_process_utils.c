@@ -49,7 +49,7 @@ static bool _log_to_file = true;
 static int _log_verbosity_level = 1;
 FILE *start_logfile;
 FILE *rotating_logfile;
-pthread_mutex_t rotating_logfile_lock = PTHREAD_MUTEX_INITIALIZER;
+nxai_mutex_t rotating_logfile_lock;
 
 static void nxai_vvlog( const char *fmt, va_list *args );
 
@@ -117,6 +117,7 @@ void nxai_initialize_logging( const char *start_log_filepath, const char *rotati
         if ( rotating_logfile == NULL ) {
             printf( "Failed to initialise logfile: %s\n", _rotating_log_filepath );
         }
+        rotating_logfile_lock = nxai_initialize_mutex();
         chmod( _rotating_log_filepath, 0666 );
         // Create old log file path
         size_t old_filepath_length = strlen( _rotating_log_filepath ) + 5 + 1;
@@ -239,7 +240,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
 
     if ( flogfile == NULL ) {
         // Start logfile was full, open rotating logfile
-        pthread_mutex_lock( &rotating_logfile_lock );
+        nxai_lock_mutex( &rotating_logfile_lock );
         if ( (size_t) logfile_last_size > logfile_max_size_mb * 1000000 ) {
             // Rotating logfile is full, rename to ".old"
             if ( rotating_logfile != NULL ) {
@@ -248,7 +249,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
                 int result = rename( _rotating_log_filepath, _old_logfile_path );
                 if ( result != 0 ) {
                     perror( "Error renaming file" );
-                    pthread_mutex_unlock( &rotating_logfile_lock );
+                    nxai_unlock_mutex( &rotating_logfile_lock );
                     return;
                 }
             }
@@ -256,12 +257,12 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
             rotating_logfile = fopen( _rotating_log_filepath, "w" );
             if ( rotating_logfile == NULL ) {
                 perror( "Error creating log file" );
-                pthread_mutex_unlock( &rotating_logfile_lock );
+                nxai_unlock_mutex( &rotating_logfile_lock );
                 return;
             }
             logfile_last_size = 0;
         }
-        pthread_mutex_unlock( &rotating_logfile_lock );
+        nxai_unlock_mutex( &rotating_logfile_lock );
         // Write to rotating log
         flogfile = rotating_logfile;
     }
@@ -397,7 +398,7 @@ static void sigchld_handler( int signum ) {
     (void) signum;
 }
 
-int waitpid_timeout( pid_t process_id, int timeout_seconds ) {
+int waitpid_timeout( nxai_process_t process_id, int timeout_seconds ) {
 #if defined( __WIN32__ )
     // Windows implementation
     HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_TERMINATE,
@@ -560,5 +561,39 @@ bool nxai_check_process_status( nxai_process_t process, int *status ) {
         *status = WEXITSTATUS( *status );
         return false;
     }
+#endif
+}
+
+// Lock mutex function
+void nxai_lock_mutex( nxai_mutex_t *mutex ) {
+#ifdef __WIN32__
+    // Windows implementation
+    WaitForSingleObject( *mutex, INFINITE );
+#else
+    // Linux implementation
+    pthread_mutex_lock( mutex );
+#endif
+}
+
+// Unlock mutex function
+void nxai_unlock_mutex( nxai_mutex_t *mutex ) {
+#ifdef __WIN32__
+    // Windows implementation
+    ReleaseMutex( *mutex );
+#else
+    // Linux implementation
+    pthread_mutex_unlock( mutex );
+#endif
+}
+
+// Initialize mutex function
+nxai_mutex_t nxai_initialize_mutex() {
+#ifdef __WIN32__
+    // Windows implementation using CreateMutex
+    return CreateMutex( NULL, FALSE, NULL );
+#else
+    // Linux implementation using pthread_mutex_t
+    static pthread_mutex_t new_mutex = PTHREAD_MUTEX_INITIALIZER;
+    return new_mutex;
 #endif
 }
