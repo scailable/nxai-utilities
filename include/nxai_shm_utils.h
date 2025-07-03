@@ -8,16 +8,18 @@ extern "C" {
 #include <stdint.h>
 
 // Platform imports
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
 #include "winsock2.h"
 #include "windows.h"
+#include <basetsd.h>
+typedef SSIZE_T ssize_t;
 #else
 #include <sys/shm.h>
 #include <sys/types.h>
 #endif
 
 // Platform types
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
 typedef HANDLE nxai_pipe_t;
 typedef HANDLE shm_id_t;
 typedef struct {

@@ -7,9 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
 // Windows stuff
 #define WIN32_LEAN_AND_MEAN
 #include <errno.h>
@@ -17,12 +16,15 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <afunix.h>
+#include <basetsd.h>
+typedef SSIZE_T ssize_t;
 #else
 // Socket stuff
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
+#include <unistd.h>
 #endif
 
 #ifdef NXAI_DEBUG
@@ -37,7 +39,7 @@ bool nxai_socket_interrupt_signal = false;
 static struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
 
 // Helper function to convert Windows errors to errno values
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
 // Windows implementation
 static int win32_error_to_errno( DWORD error ) {
     switch ( error ) {
@@ -54,7 +56,7 @@ static int win32_error_to_errno( DWORD error ) {
 #endif
 
 int nxai_socket_initialize_sockets() {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     WSADATA wsaData;
     int result = WSAStartup( MAKEWORD( 2, 2 ), &wsaData );
@@ -67,7 +69,7 @@ int nxai_socket_initialize_sockets() {
 }
 
 int nxai_socket_finalize_sockets() {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     WSACleanup();
 #endif
@@ -75,7 +77,7 @@ int nxai_socket_finalize_sockets() {
 }
 
 uint32_t nxai_socket_send_receive_message( const char *socket_path, const char *message_to_send, const uint32_t sending_message_length, char **return_message_buffer, size_t *allocated_message_length ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     SOCKET connection_fd = INVALID_SOCKET;
 
@@ -144,7 +146,7 @@ uint32_t nxai_socket_send_receive_message( const char *socket_path, const char *
 }
 
 int nxai_socket_create_listener( const char *socket_path ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     SOCKET socket_fd = INVALID_SOCKET;
 
@@ -243,7 +245,7 @@ int nxai_socket_create_listener( const char *socket_path ) {
 }
 
 void nxai_socket_receive_on_connection( int connection_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     int flags = 0;
     size_t num_read_cumulative = 0;
@@ -325,7 +327,7 @@ void nxai_socket_receive_on_connection( int connection_fd, size_t *allocated_buf
 }
 
 int nxai_socket_await_message( int socket_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     SOCKET connection_fd = INVALID_SOCKET;
 
@@ -358,7 +360,7 @@ int nxai_socket_await_message( int socket_fd, size_t *allocated_buffer_size, cha
  *
  */
 int32_t nxai_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t, int ) ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     SOCKET socket_fd = INVALID_SOCKET;
     uint32_t message_length;
@@ -448,7 +450,7 @@ int32_t nxai_socket_start_listener( const char *socket_path, void ( *callback_fu
 }
 
 int32_t nxai_socket_connect( const char *socket_path ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     SOCKET socket_fd = INVALID_SOCKET;
 
@@ -537,7 +539,7 @@ void nxai_socket_send( const char *socket_path, const char *message_to_send, uin
     nxai_socket_send_to_connection( connection_fd, message_to_send, message_length );
 
 // Close socket
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     closesocket( connection_fd );
 #else
@@ -547,7 +549,7 @@ void nxai_socket_send( const char *socket_path, const char *message_to_send, uin
 }
 
 bool nxai_socket_send_to_connection( const int connection_fd, const char *message_to_send, uint32_t message_length ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     // Set timeout for sending
     struct timeval tv = { /* Initialize timeouts */ };

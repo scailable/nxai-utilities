@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #ifdef NXAI_DEBUG
 #include "memory_leak_detector.h"
@@ -21,16 +20,18 @@
 #include <time.h>
 #endif
 
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
 // Windows stuff
 #include "winsock2.h"
 #include "windows.h"
-// Windows equivalent of Linux shared memory header
+#include <basetsd.h>
+typedef SSIZE_T ssize_t;
 #else
 // Pipe stuff
 #include <sys/select.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 // SHM stuff
@@ -52,7 +53,7 @@ bidirectional_pipe_t nxai_initialize_pipe( nxai_pipe_t up_pipe_read, nxai_pipe_t
 }
 
 bidirectional_pipe_t nxai_create_pipe( int *error ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     bidirectional_pipe_t created_pipe = { { INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE },
                                           { INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE } };
@@ -108,7 +109,7 @@ bidirectional_pipe_t nxai_create_pipe( int *error ) {
 }
 
 char nxai_pipe_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     char buffer;
     DWORD bytes_read;
@@ -138,7 +139,7 @@ char nxai_pipe_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction ) {
 }
 
 ssize_t nxai_pipe_send( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction, char signal ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     DWORD bytes_written;
     if ( !WriteFile( nxai_pipe_get_write_pipe( pipe_fd, direction ), &signal, 1, &bytes_written, NULL ) ) {
@@ -152,7 +153,7 @@ ssize_t nxai_pipe_send( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction, 
 }
 
 char nxai_pipe_timed_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction, int timeout ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     char buffer;
     DWORD bytes_read;
@@ -202,7 +203,7 @@ char nxai_pipe_timed_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION directio
 }
 
 void nxai_pipe_close( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     if ( direction == DOWN ) {
         CloseHandle( nxai_pipe_get_write_pipe( pipe, UP ) );
@@ -227,7 +228,7 @@ void nxai_pipe_close( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
 }
 
 nxai_shm_t nxai_shm_create_random( size_t size ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     // Generate random name for anonymous mapping
     nxai_shm_t new_shm;
@@ -261,7 +262,7 @@ nxai_shm_t nxai_shm_create_random( size_t size ) {
 }
 
 nxai_shm_t nxai_shm_create( const char *path, int project_id, size_t size ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     wchar_t wPath[MAX_PATH];
     mbstowcs_s( NULL, wPath, MAX_PATH, path, _TRUNCATE );
@@ -297,7 +298,7 @@ nxai_shm_t nxai_shm_create( const char *path, int project_id, size_t size ) {
 }
 
 bool nxai_shm_get_id( nxai_shm_t *shm ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     shm->id = OpenFileMappingW( FILE_MAP_ALL_ACCESS, FALSE, shm->key );
     return true;
@@ -313,7 +314,7 @@ bool nxai_shm_get_id( nxai_shm_t *shm ) {
 }
 
 void *nxai_shm_attach( nxai_shm_t shm ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     return MapViewOfFile(
             shm.key,            // Handle to map object
@@ -345,7 +346,7 @@ void nxai_shm_write_to_attached( void *shm_buffer, const char *data, uint32_t si
 }
 
 bool nxai_shm_write( const nxai_shm_t *shm, const char *data, uint32_t size ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     LPVOID view = MapViewOfFile(
             shm->id,
@@ -389,7 +390,7 @@ void nxai_shm_read_from_attached( void *shm_pointer, size_t *data_length, char *
 }
 
 void *nxai_shm_read( nxai_shm_t *shm, size_t *data_length, char **payload_data ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     LPVOID view = MapViewOfFile(
             shm->id,
@@ -417,7 +418,7 @@ void *nxai_shm_read( nxai_shm_t *shm, size_t *data_length, char **payload_data )
 }
 
 void nxai_shm_close( void *memory_address ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     UnmapViewOfFile( memory_address );
 #else
@@ -428,7 +429,7 @@ void nxai_shm_close( void *memory_address ) {
 }
 
 int nxai_shm_destroy( const nxai_shm_t *shm ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     int result = CloseHandle( shm->id );
     return result ? 0 : -1;
@@ -439,7 +440,7 @@ int nxai_shm_destroy( const nxai_shm_t *shm ) {
 }
 
 bool nxai_shm_realloc( nxai_shm_t *shm, size_t new_size ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     CloseHandle( shm->id );
 
@@ -472,7 +473,7 @@ bool nxai_shm_realloc( nxai_shm_t *shm, size_t new_size ) {
 }
 
 size_t nxai_shm_get_size( nxai_shm_t *shm ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     MEMORY_BASIC_INFORMATION memInfo;
     VirtualQuery( MapViewOfFile( shm->id, FILE_MAP_READ, 0, 0, 0 ),

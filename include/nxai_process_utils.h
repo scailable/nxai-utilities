@@ -4,13 +4,13 @@
 extern "C" {
 #endif
 
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
 // Windows specific imports
+#include <windows.h>
 #include <handleapi.h>
 #include <ioapiset.h>
 #include <processthreadsapi.h>
 #include <synchapi.h>
-#include <windows.h>
 typedef HANDLE nxai_pipe_t;
 typedef DWORD nxai_process_t;
 typedef HANDLE nxai_thread_t;

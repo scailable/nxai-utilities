@@ -13,7 +13,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
 // Windows specific imports
 #include <handleapi.h>
 #include <ioapiset.h>
@@ -56,7 +56,7 @@ static void nxai_vvlog( const char *fmt, va_list *args );
 bool nxai_process_started( nxai_process_t process );
 
 uint64_t nxai_current_timestamp_ms() {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     FILETIME ft;
     ULARGE_INTEGER ui;
@@ -78,7 +78,7 @@ uint64_t nxai_current_timestamp_ms() {
 }
 
 uint64_t nxai_current_timestamp_us() {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     FILETIME ft;
     ULARGE_INTEGER ui;
@@ -155,7 +155,7 @@ void nxai_vlog( const char *fmt, ... ) {
 }
 
 bool nxai_get_file_size( const char *filepath, size_t *file_size ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows specific implementation
     WIN32_FIND_DATA fileData;
     HANDLE hFile = FindFirstFile( filepath, &fileData );
@@ -287,7 +287,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
 }
 
 bool nxai_process_started( nxai_process_t process ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     if ( process == 1 ) {
         return false;
@@ -302,7 +302,7 @@ bool nxai_process_started( nxai_process_t process ) {
 }
 
 nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxai_pipe_t *stderr_pipe ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     // Create pipe for stderr redirection
     SECURITY_ATTRIBUTES saAttr;
@@ -399,7 +399,7 @@ static void sigchld_handler( int signum ) {
 }
 
 int waitpid_timeout( nxai_process_t process_id, int timeout_seconds ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_TERMINATE,
                                    FALSE, process_id );
@@ -477,7 +477,7 @@ char *nxai_read_pipe_to_string( nxai_pipe_t pipe ) {
     char *out_string = (char *) malloc( 1024 );
     size_t total_bytes_read = 0;
     char buffer[1024];
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     DWORD bytes_read;
     while ( ( bytes_read = ReadFile( pipe, buffer, sizeof( buffer ), &bytes_read, NULL ) ) > 0 ) {
@@ -498,7 +498,7 @@ char *nxai_read_pipe_to_string( nxai_pipe_t pipe ) {
 }
 
 int nxai_kill_process( nxai_process_t process ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     // Get handle to process with full permissions
     HANDLE hProcess = OpenProcess( PROCESS_TERMINATE | PROCESS_QUERY_INFORMATION,
@@ -537,7 +537,7 @@ int nxai_kill_process( nxai_process_t process ) {
 }
 
 bool nxai_check_process_status( nxai_process_t process, int *status ) {
-#if defined( __WIN32__ )
+#if defined( _MSC_VER )
     // Windows implementation
     HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION,
                                    FALSE, process );
