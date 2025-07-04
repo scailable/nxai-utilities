@@ -226,7 +226,7 @@ int nxai_socket_create_listener( const char *socket_path ) {
     }
 
     // Set the socket file permissions to open
-    chmod( socket_path, 0777 );
+    nxai_chmod( socket_path, 0777 );
 
     // Start listening on socket
     if ( listen( socket_fd, 30 ) == -1 ) {
@@ -235,7 +235,7 @@ int nxai_socket_create_listener( const char *socket_path ) {
     }
 
     // Change file permissions so anyone can write to it
-    chmod( socket_path, S_IRGRP | S_IRUSR | S_IROTH | S_IWGRP | S_IWOTH | S_IWUSR );
+    nxai_chmod( socket_path, S_IRGRP | S_IRUSR | S_IROTH | S_IWGRP | S_IWOTH | S_IWUSR );
 
     // Set timeout for socket
     setsockopt( socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv, sizeof tv );
@@ -402,9 +402,7 @@ int32_t nxai_socket_start_listener( const char *socket_path, void ( *callback_fu
     }
 
     // Delete socket file
-    wchar_t wpath[MAX_PATH];
-    MultiByteToWideChar( CP_UTF8, 0, socket_path, -1, wpath, MAX_PATH );
-    DeleteFileW( wpath );
+    DeleteFileA( socket_path );
 
     return 0;
 #else
@@ -446,6 +444,16 @@ int32_t nxai_socket_start_listener( const char *socket_path, void ( *callback_fu
     unlink( socket_path );
 
     return 0;
+#endif
+}
+
+void nxai_delete_socket_file( const char *socket_path ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    DeleteFileA( socket_path );
+#else
+    // Linux implementation
+    unlink( socket_path );
 #endif
 }
 
@@ -538,13 +546,17 @@ void nxai_socket_send( const char *socket_path, const char *message_to_send, uin
     // Send message to newly created socket
     nxai_socket_send_to_connection( connection_fd, message_to_send, message_length );
 
+    nxai_close_socket( connection_fd );
+}
+
+int nxai_close_socket( int connection_fd ) {
 // Close socket
 #if defined( _MSC_VER )
     // Windows implementation
-    closesocket( connection_fd );
+    return closesocket( connection_fd );
 #else
     // Linux implementation
-    close( connection_fd );
+    return close( connection_fd );
 #endif
 }
 

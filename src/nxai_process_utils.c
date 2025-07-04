@@ -9,9 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <time.h>
-#include <unistd.h>
 
 #if defined( _MSC_VER )
 // Windows specific imports
@@ -20,12 +18,14 @@
 #include <processthreadsapi.h>
 #include <synchapi.h>
 #include <windows.h>
+#include <io.h>
 #else
 // Linux specific imports
 #include <spawn.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/wait.h>
+#include <unistd.h>
 #endif
 
 #ifdef NXAI_DEBUG
@@ -53,7 +53,25 @@ nxai_mutex_t rotating_logfile_lock;
 
 static void nxai_vvlog( const char *fmt, va_list *args );
 
-bool nxai_process_started( nxai_process_t process );
+void nxai_chmod( const char *filepath, int mode ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    _chmod( filepath, mode );
+#else
+    // Linux implementation
+    chmod( filepath, mode );
+#endif
+}
+
+void nxai_sleep( int milliseconds ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    Sleep( milliseconds );
+#else
+    // Linux implementation
+    usleep( milliseconds * 1000 );
+#endif
+}
 
 uint64_t nxai_current_timestamp_ms() {
 #if defined( _MSC_VER )
@@ -99,6 +117,14 @@ uint64_t nxai_current_timestamp_us() {
 #endif
 }
 
+#if defined( _WIN32 ) || defined( _WIN64 )
+#define NXAI_FILE_PERMS _S_IWRITE | _S_IREAD
+#define NXAI_SET_FILE_PERMS _chmod
+#else
+#define NXAI_FILE_PERMS 0666
+#define NXAI_SET_FILE_PERMS chmod
+#endif
+
 void nxai_initialize_logging( const char *start_log_filepath, const char *rotating_log_filepath, const char *log_prefix, bool log_to_console, bool log_to_file, int log_verbosity_level ) {
     _start_log_filepath = strdup( start_log_filepath );
     _rotating_log_filepath = strdup( rotating_log_filepath );
@@ -112,13 +138,13 @@ void nxai_initialize_logging( const char *start_log_filepath, const char *rotati
         if ( start_logfile == NULL ) {
             printf( "Failed to initialise logfile: %s\n", _start_log_filepath );
         }
-        chmod( _start_log_filepath, 0666 );
+        NXAI_SET_FILE_PERMS( _start_log_filepath, 0666 );
         rotating_logfile = fopen( _rotating_log_filepath, "w" );
         if ( rotating_logfile == NULL ) {
             printf( "Failed to initialise logfile: %s\n", _rotating_log_filepath );
         }
         rotating_logfile_lock = nxai_initialize_mutex();
-        chmod( _rotating_log_filepath, 0666 );
+        NXAI_SET_FILE_PERMS( _rotating_log_filepath, 0666 );
         // Create old log file path
         size_t old_filepath_length = strlen( _rotating_log_filepath ) + 5 + 1;
         _old_logfile_path = (char *) malloc( old_filepath_length );
@@ -566,7 +592,7 @@ bool nxai_check_process_status( nxai_process_t process, int *status ) {
 
 // Lock mutex function
 void nxai_lock_mutex( nxai_mutex_t *mutex ) {
-#ifdef __WIN32__
+#if defined( _MSC_VER )
     // Windows implementation
     WaitForSingleObject( *mutex, INFINITE );
 #else
@@ -577,7 +603,7 @@ void nxai_lock_mutex( nxai_mutex_t *mutex ) {
 
 // Unlock mutex function
 void nxai_unlock_mutex( nxai_mutex_t *mutex ) {
-#ifdef __WIN32__
+#if defined( _MSC_VER )
     // Windows implementation
     ReleaseMutex( *mutex );
 #else
@@ -588,7 +614,7 @@ void nxai_unlock_mutex( nxai_mutex_t *mutex ) {
 
 // Initialize mutex function
 nxai_mutex_t nxai_initialize_mutex() {
-#ifdef __WIN32__
+#if defined( _MSC_VER )
     // Windows implementation using CreateMutex
     return CreateMutex( NULL, FALSE, NULL );
 #else

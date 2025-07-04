@@ -7,7 +7,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+
+#if defined( _MSC_VER )
+// Windows specific imports
+#else
+// Linux specific imports
 #include <unistd.h>
+#endif
 
 #include "mpack.h"
 #include "yyjson.h"

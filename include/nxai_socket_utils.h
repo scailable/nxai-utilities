@@ -89,6 +89,8 @@ int nxai_socket_await_message( int socket_fd, size_t *allocated_buffer_size, cha
  */
 int32_t nxai_socket_start_listener( const char *socket_path, void ( *callback_function )( const char *, uint32_t, int ) );
 
+void nxai_delete_socket_file( const char *socket_path );
+
 /**
  * @brief Connects to a Unix domain socket at a given path.
  * 
@@ -110,6 +112,8 @@ int32_t nxai_socket_connect( const char *socket_path );
  * @param message_to_send String to send
  */
 void nxai_socket_send( const char *socket_path, const char *string_to_send, uint32_t message_length );
+
+int nxai_close_socket( int connection_fd );
 
 /**
  * @brief Sends a message through a socket and receives a response.

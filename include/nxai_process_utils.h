@@ -35,6 +35,10 @@ typedef pthread_mutex_t nxai_mutex_t;
 #define debug_vlog( fmt, args... ) /* Don't do anything in release builds */
 #endif
 
+void nxai_chmod( const char *filepath, int mode );
+
+void nxai_sleep( int milliseconds );
+
 uint64_t nxai_current_timestamp_ms();
 
 uint64_t nxai_current_timestamp_us();
