@@ -1075,11 +1075,6 @@ static void mpack_writer_clear(mpack_writer_t* writer) {
     #endif
 }
 
-MPACK_INLINE void mpack_writer_track_pop(mpack_writer_t* writer, mpack_type_t type) {
-    MPACK_UNUSED(writer);
-    MPACK_UNUSED(type);
-}
-
 void mpack_writer_init(mpack_writer_t* writer, char* buffer, size_t size) {
     mpack_assert(buffer != NULL, "cannot initialize writer with empty buffer");
     mpack_writer_clear(writer);
@@ -1917,10 +1912,6 @@ void mpack_write_u32(mpack_writer_t* writer, uint32_t value) {
     #endif
 }
 
-MPACK_INLINE void mpack_write_uint(mpack_writer_t* writer, uint64_t value) {
-    mpack_write_u64(writer, value);
-}
-
 void mpack_write_u64(mpack_writer_t* writer, uint64_t value) {
     mpack_writer_track_element(writer);
 
@@ -2036,11 +2027,6 @@ void mpack_write_i64(mpack_writer_t* writer, int64_t value) {
     }
 }
 
-/** Writes an integer in the most efficient packing available. */
-MPACK_INLINE void mpack_write_int(mpack_writer_t* writer, int64_t value) {
-    mpack_write_i64(writer, value);
-}
-
 #if MPACK_FLOAT
 void mpack_write_float(mpack_writer_t* writer, float value) {
     mpack_writer_track_element(writer);
@@ -2125,36 +2111,6 @@ void mpack_start_map(mpack_writer_t* writer, uint32_t count) {
     mpack_write_map_notrack(writer, count);
     mpack_writer_track_push(writer, mpack_type_map, count);
     mpack_builder_compound_push(writer);
-}
-
-MPACK_INLINE void mpack_builder_compound_pop( mpack_writer_t *writer ) {
-    MPACK_UNUSED( writer );
-
-#if MPACK_BUILDER
-    mpack_build_t *build = writer->builder.current_build;
-    if ( build != NULL ) {
-        mpack_assert( build->nested_compound_elements > 0 );
-        --build->nested_compound_elements;
-    }
-#endif
-}
-
-MPACK_INLINE void mpack_finish_array( mpack_writer_t *writer ) {
-    mpack_writer_track_pop( writer, mpack_type_array );
-    mpack_builder_compound_pop( writer );
-}
-
-MPACK_INLINE void mpack_finish_map( mpack_writer_t *writer ) {
-    mpack_writer_track_pop( writer, mpack_type_map );
-    mpack_builder_compound_pop( writer );
-}
-
-MPACK_INLINE void mpack_finish_bin( mpack_writer_t *writer ) {
-    mpack_writer_track_pop( writer, mpack_type_bin );
-}
-
-MPACK_INLINE mpack_error_t mpack_tree_error( mpack_tree_t *tree ) {
-    return tree->error;
 }
 
 static void mpack_start_str_notrack(mpack_writer_t* writer, uint32_t count) {
