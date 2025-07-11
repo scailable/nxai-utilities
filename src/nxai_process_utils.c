@@ -26,6 +26,7 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <sys/prctl.h>
 #endif
 
 #ifdef NXAI_DEBUG
@@ -60,6 +61,26 @@ void nxai_chmod( const char *filepath, int mode ) {
 #else
     // Linux implementation
     chmod( filepath, mode );
+#endif
+}
+
+void nxai_ensure_child_cleanup() {
+#if defined( _MSC_VER )
+    // Windows implementation
+    HANDLE job = CreateJobObject( NULL, NULL );
+    JOBOBJECT_ASSOCIATE_COMPLETION_PORT jobInfo;
+    jobInfo.CompletionPort = (ULONG_PTR) CreateIoCompletionPort( INVALID_HANDLE_VALUE, NULL, NULL, 0 );
+    jobInfo.CompletionKey = NULL;
+
+    SetInformationJobObject( job, JobObjectAssociateCompletionPortInformation,
+                             &jobInfo, sizeof( jobInfo ) );
+
+    AssignProcessToJobObject( job, GetCurrentProcess() );
+
+    CloseHandle( job );// Parent keeps handle closed
+#else
+    // Linux implementation
+    prctl( PR_SET_PDEATHSIG, SIGTERM );
 #endif
 }
 

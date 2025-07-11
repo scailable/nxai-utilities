@@ -37,6 +37,20 @@ typedef pthread_mutex_t nxai_mutex_t;
 
 void nxai_chmod( const char *filepath, int mode );
 
+/**
+ * Ensures proper cleanup of child processes when the parent process terminates.
+ *
+ * This function implements cross-platform functionality to handle child process
+ * termination across Windows and Linux platforms. On Windows, it uses Job Objects
+ * to monitor the parent process, while on Linux it utilizes the prctl system call.
+ *
+ * @see nxai_ensure_child_cleanup() for the implementation details
+ * @note This function must be called from the child process
+ * @warning Failure to call this function may result in orphaned processes
+ *          if the parent terminates unexpectedly
+ */
+void nxai_ensure_child_cleanup();
+
 void nxai_sleep( int milliseconds );
 
 uint64_t nxai_current_timestamp_ms();
