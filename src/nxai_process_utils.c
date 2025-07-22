@@ -19,6 +19,8 @@
 #include <synchapi.h>
 #include <windows.h>
 #include <io.h>
+#include <tchar.h>
+#include <strsafe.h>
 #else
 // Linux specific imports
 #include <spawn.h>
@@ -54,6 +56,10 @@ nxai_mutex_t rotating_logfile_lock;
 
 static void nxai_vvlog( const char *fmt, va_list *args );
 
+int nxai_strcasecmp( const char *str1, const char *str2 ) {
+    return _stricmp( str1, str2 );
+}
+
 void nxai_chmod( const char *filepath, int mode ) {
 #if defined( _MSC_VER )
     // Windows implementation
@@ -64,12 +70,49 @@ void nxai_chmod( const char *filepath, int mode ) {
 #endif
 }
 
+void nxai_thread_join( nxai_thread_t *thread ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    WaitForSingleObject( thread, INFINITE );
+#else
+    // Linux implementation
+    pthread_join( thread );
+#endif
+}
+
+bool nxai_thread_create( nxai_thread_t *thread, function_ptr function, void *input_arguments ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    DWORD dwThreadIdArray;
+
+    // Create the thread to begin execution on its own.
+    thread = CreateThread(
+            NULL,              // default security attributes
+            0,                 // use default stack size
+            function,          // thread function name
+            input_arguments,   // argument to thread function
+            0,                 // use default creation flags
+            &dwThreadIdArray );// returns the thread identifier
+
+    // Check the return value for success.
+    if ( thread == NULL ) {
+        nxai_vlog( "Could not create thread!\n" );
+        return false;
+    }
+    return true;
+#else
+    // Linux implementation
+    int ret = pthread_create( thread, NULL, (void *) function, NULL );
+    return ret == 0;
+#endif
+}
+
 void nxai_ensure_child_cleanup() {
 #if defined( _MSC_VER )
     // Windows implementation
     HANDLE job = CreateJobObject( NULL, NULL );
     JOBOBJECT_ASSOCIATE_COMPLETION_PORT jobInfo;
-    jobInfo.CompletionPort = (ULONG_PTR) CreateIoCompletionPort( INVALID_HANDLE_VALUE, NULL, NULL, 0 );
+    jobInfo.CompletionPort = CreateIoCompletionPort( INVALID_HANDLE_VALUE, NULL, 1, 0 );
     jobInfo.CompletionKey = NULL;
 
     SetInformationJobObject( job, JobObjectAssociateCompletionPortInformation,
@@ -445,7 +488,7 @@ static void sigchld_handler( int signum ) {
     (void) signum;
 }
 
-int waitpid_timeout( nxai_process_t process_id, int timeout_seconds ) {
+int nxai_process_wait( nxai_process_t process_id, int timeout_seconds ) {
 #if defined( _MSC_VER )
     // Windows implementation
     HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_TERMINATE,
@@ -511,8 +554,7 @@ int waitpid_timeout( nxai_process_t process_id, int timeout_seconds ) {
         return WEXITSTATUS( status );
     } else if ( sig == -1 && errno == ETIMEDOUT ) {
         // Timeout expired before child finished
-        kill( process_id, SIGKILL );// Kill the child process
-        return -1;                  // Indicate timeout
+        return -1;// Indicate timeout
     } else {
         // Error in sigtimedwait
         return -1;
@@ -545,6 +587,23 @@ char *nxai_read_pipe_to_string( nxai_pipe_t pipe ) {
 }
 
 int nxai_kill_process( nxai_process_t process ) {
+
+    HANDLE hProcess = OpenProcess( PROCESS_TERMINATE | PROCESS_QUERY_INFORMATION,
+                                   FALSE, process );
+    if ( hProcess == NULL ) {
+        return ERROR_INVALID_HANDLE;
+    }
+
+    // Force termination if graceful shutdown failed
+    DWORD exitCode;
+    if ( GetExitCodeProcess( hProcess, &exitCode ) && exitCode != STILL_ACTIVE ) {
+        TerminateProcess( hProcess, 1 );
+    }
+
+    CloseHandle( hProcess );
+}
+
+int nxai_shutdown_process( nxai_process_t process ) {
 #if defined( _MSC_VER )
     // Windows implementation
     // Get handle to process with full permissions
@@ -564,7 +623,6 @@ int nxai_kill_process( nxai_process_t process ) {
     DWORD status;
     GetExitCodeProcess( hProcess, &status );
 
-    CloseHandle( hProcess );
 #else
     // Linux implementation
     // Send SIGTERM to the process
@@ -579,7 +637,7 @@ int nxai_kill_process( nxai_process_t process ) {
     waitpid( process, &status, 0 );
 
 #endif
-    nxai_vlog( "Module finished with status: %d\n", status );
+    nxai_vlog( "Prcess finished with status: %d\n", status );
     return status;
 }
 

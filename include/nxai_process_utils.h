@@ -6,6 +6,7 @@ extern "C" {
 
 #if defined( _MSC_VER )
 // Windows specific imports
+#define NOMINMAX//< Needed to prevent windows.h define macros min() and max().
 #include <windows.h>
 #include <handleapi.h>
 #include <ioapiset.h>
@@ -22,7 +23,6 @@ typedef HANDLE nxai_mutex_t;
 typedef int nxai_pipe_t;
 typedef pid_t nxai_process_t;
 typedef pthread_t nxai_thread_t;
-typedef pthread_mutex_t nxai_mutex_t;
 #endif
 
 #include <stdarg.h>
@@ -35,7 +35,14 @@ typedef pthread_mutex_t nxai_mutex_t;
 #define debug_vlog( fmt, args... ) /* Don't do anything in release builds */
 #endif
 
+int nxai_strcasecmp( const char *str1, const char *str2 );
+
 void nxai_chmod( const char *filepath, int mode );
+
+void nxai_thread_join( nxai_thread_t *thread );
+
+typedef unsigned long ( *function_ptr )( void * );
+bool nxai_thread_create( nxai_thread_t *thread, function_ptr function, void *input_arguments );
 
 /**
  * Ensures proper cleanup of child processes when the parent process terminates.
@@ -67,11 +74,13 @@ void nxai_vlog( const char *fmt, ... );
 
 nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxai_pipe_t *stderr_pipe );
 
-int waitpid_timeout( nxai_process_t process_id, int timeout_seconds );
+int nxai_process_wait( nxai_process_t process_id, int timeout_seconds );
 
 char *nxai_read_pipe_to_string( nxai_pipe_t pipe );
 
 int nxai_kill_process( nxai_process_t process );
+
+int nxai_shutdown_process( nxai_process_t process );
 
 bool nxai_check_process_status( nxai_process_t process, int *status );
 

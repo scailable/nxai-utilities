@@ -23,7 +23,7 @@ typedef SSIZE_T ssize_t;
 typedef HANDLE nxai_pipe_t;
 typedef HANDLE shm_id_t;
 typedef struct {
-    wchar_t key[MAX_PATH];
+    LPCSTR key[MAX_PATH];
     shm_id_t id;
 } nxai_shm_t;
 #else
@@ -45,6 +45,12 @@ typedef enum {
     DOWN = 2
 } PIPE_DIRECTION;
 
+char *nxai_shm_key_to_string( nxai_shm_t shm );
+
+char *nxai_shm_id_to_string( nxai_shm_t shm );
+
+char *nxai_pipe_to_string( nxai_pipe_t pipe );
+
 nxai_pipe_t nxai_pipe_get_write_pipe( bidirectional_pipe_t pipe, PIPE_DIRECTION direction );
 
 nxai_pipe_t nxai_pipe_get_read_pipe( bidirectional_pipe_t pipe, PIPE_DIRECTION direction );
@@ -52,6 +58,8 @@ nxai_pipe_t nxai_pipe_get_read_pipe( bidirectional_pipe_t pipe, PIPE_DIRECTION d
 bidirectional_pipe_t nxai_initialize_pipe( nxai_pipe_t up_pipe_read, nxai_pipe_t up_pipe_write, nxai_pipe_t down_pipe_read, nxai_pipe_t down_pipe_write );
 
 bidirectional_pipe_t nxai_create_pipe( int *error );
+
+size_t nxai_pipe_poll( bidirectional_pipe_t *pipes_array, size_t pipes_length, PIPE_DIRECTION direction, int8_t *return_byte );
 
 char nxai_pipe_read( bidirectional_pipe_t pipe, PIPE_DIRECTION direction );
 

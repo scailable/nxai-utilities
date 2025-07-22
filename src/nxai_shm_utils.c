@@ -27,17 +27,56 @@
 #include <basetsd.h>
 typedef SSIZE_T ssize_t;
 #else
-// Pipe stuff
+// Linux stuff
 #include <sys/select.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #endif
 
+#include "nxai_process_utils.h"
+
 // SHM stuff
 #include <fcntl.h>
 
 #define HEADER_BYTES 4
+
+char *nxai_shm_key_to_string( nxai_shm_t shm ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    // Copy string so it can be freed
+    char *shm_string = malloc( strlen( shm.key ) );
+#else
+    // Linux implementation
+    char *shm_string = (char *) sclbl_itoa( shm.key );
+#endif
+    return shm_string;
+}
+
+char *nxai_shm_id_to_string( nxai_shm_t shm ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    // Copy string so it can be freed
+    char *id_string = malloc( 20 );
+    sprintf( id_string, L"%p", shm.id );
+#else
+    // Linux implementation
+    char *id_string = (char *) sclbl_itoa( shm.id );
+#endif
+    return id_string;
+}
+
+char *nxai_pipe_to_string( nxai_pipe_t pipe ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    char *pipe_string = malloc( 20 );
+    sprintf( pipe_string, L"%p", pipe );
+#else
+    // Linux implementation
+    char *pipe_string = (char *) sclbl_itoa( input_pipe.up_pipe[0] );
+#endif
+    return pipe_string;
+}
 
 nxai_pipe_t nxai_pipe_get_write_pipe( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
     return direction == UP ? pipe.up_pipe[1] : pipe.down_pipe[1];
@@ -105,6 +144,146 @@ bidirectional_pipe_t nxai_create_pipe( int *error ) {
 
     *error = 0;
     return created_pipe;
+#endif
+}
+
+size_t nxai_pipe_poll( bidirectional_pipe_t *pipes_array, size_t pipes_length, PIPE_DIRECTION direction, int8_t *return_byte ) {
+    const int timeout_ms = 1000;
+
+#if defined( _MSC_VER )
+    // Windows implementation
+    // Allocate array for OVERLAPPED structures
+    OVERLAPPED *overlapped_array = (OVERLAPPED *) malloc( sizeof( OVERLAPPED ) * pipes_length );
+
+    // Initialize OVERLAPPED structures
+    for ( size_t index = 0; index < pipes_length; index++ ) {
+        ZeroMemory( &overlapped_array[index], sizeof( OVERLAPPED ) );
+        overlapped_array[index].hEvent = CreateEvent( NULL, TRUE, FALSE, NULL );
+        if ( overlapped_array[index].hEvent == NULL ) {
+            // Clean up previously allocated events
+            for ( size_t i = 0; i < index; i++ ) {
+                CloseHandle( overlapped_array[i].hEvent );
+            }
+            free( overlapped_array );
+            return pipes_length;
+        }
+    }
+
+    nxai_vlog( "Waiting for output from any inference engine.\n" );
+
+    // Wait for any pipe to have data
+    DWORD wait_result = WaitForMultipleObjects(
+            pipes_length,
+            (HANDLE *) overlapped_array,
+            FALSE,// Don't wait for all events
+            timeout_ms );
+
+    if ( wait_result == WAIT_FAILED ) {
+        DWORD last_error = GetLastError();
+        nxai_vlog( "Error! Could not poll inference engine pipe! %d\n", last_error );
+        fprintf( stderr, "\nError! Could not poll inference engine pipe! %d", last_error );
+        raise( SIGABRT );
+        free( overlapped_array );
+        return pipes_length;
+    }
+
+    if ( wait_result == WAIT_TIMEOUT ) {
+        nxai_vlog( "Timed out waiting for client output\n" );
+        free( overlapped_array );
+        return pipes_length;
+    }
+
+    // Determine which inference engine signalled
+    size_t index;
+    for ( index = 0; index < pipes_length; index++ ) {
+        if ( wait_result == WAIT_OBJECT_0 + index ) {
+            // Pipe has data to read
+            DWORD bytesRead;
+            int8_t read_byte;
+            if ( !ReadFile(
+                         nxai_pipe_get_read_pipe( pipes_array[index], direction ),
+                         &read_byte,
+                         sizeof( read_byte ),
+                         &bytesRead,
+                         &overlapped_array[index] ) ) {
+                if ( GetLastError() != ERROR_IO_PENDING ) {
+                    nxai_vlog( "Error! Could not read from pipe %zu\n", index );
+                    fprintf( stderr, "\nError! Could not read from pipe %zu", index );
+                    raise( SIGABRT );
+                    free( overlapped_array );
+                    return pipes_length;
+                }
+            }
+            *return_byte = read_byte;
+            break;
+        }
+    }
+
+    // Clean up
+    for ( size_t i = 0; i < pipes_length; i++ ) {
+        CloseHandle( overlapped_array[i].hEvent );
+    }
+    free( overlapped_array );
+#else
+    // Linux implementation
+
+    // Gather pipes into single array
+    struct pollfd *poll_fds = (struct pollfd *) malloc( sizeof( struct pollfd ) * pipes_length );
+    for ( size_t index = 0; index < pipes_length; index++ ) {
+        poll_fds[index].fd = nxai_pipe_get_read_pipe( pipes_array[index], direction );
+        poll_fds[index].events = POLLIN;// Monitor for input
+    }
+
+    // Wait for any pipe to write data
+    nxai_vlog( "Waiting for output from any inference engine.\n" );
+    int ready = poll( poll_fds, pipes_length, timeout_ms );
+
+    if ( ready < 0 ) {
+        free( poll_fds );
+        if ( errno != EINTR ) {
+            // Error is something other than receiving interrupt signal. Raise error
+            nxai_vlog( "Error! Could not poll inference engine pipe! %d %s\n", ready, strerror( errno ) );
+            fprintf( stderr, "\nError! Could not poll inference engine pipe! %d %s", ready, strerror( errno ) );
+            raise( SIGABRT );
+        }
+        return pipes_length;
+    }
+
+    if ( ready == 0 ) {
+        nxai_vlog( "Timed out waiting for client output\n" );
+        free( poll_fds );
+        return pipes_length;
+    }
+
+    // Determine which inference engine signalled
+    size_t index;
+    for ( index = 0; index < pipes_length; index++ ) {
+        if ( poll_fds[index].revents & POLLIN ) {
+            // Pipe has data to read. Read byte and clear flag
+            int8_t read_byte = (int8_t) nxai_pipe_read( pipes_array[index], direction );
+            if ( read_byte == -1 ) {
+                nxai_vlog( "Error! Could not read from pipe %zu\n", index );
+                fprintf( stderr, "\nError! Could not read from pipe %zu", index );
+                raise( SIGABRT );
+                free( poll_fds );
+                return pipes_length;
+            }
+            poll_fds[index].events &= ~POLLIN;
+            // Return the inference ID received from sclbld
+            *return_byte = read_byte;
+            break;
+        } else if ( poll_fds[index].revents & POLLERR || poll_fds[index].revents & POLLHUP ) {
+            nxai_vlog( "Error! Failed to communicate with inference engine %zu\n", index );
+            fprintf( stderr, "\nError! Failed to communicate with inference engine %zu", index );
+            close( poll_fds[index].fd );
+            poll_fds[index].fd = -1;
+            raise( SIGABRT );
+            free( poll_fds );
+            return pipes_length;
+        }
+    }
+
+    free( poll_fds );
 #endif
 }
 
@@ -232,10 +411,10 @@ nxai_shm_t nxai_shm_create_random( size_t size ) {
     // Windows implementation
     // Generate random name for anonymous mapping
     nxai_shm_t new_shm;
-    swprintf_s( new_shm.key, MAX_PATH, L"\\\\\\.\\Global\\RandomSHM_%08X", rand() );
+    sprintf_s( new_shm.key, MAX_PATH, L"\\\\\\.\\Global\\RandomSHM_%08X", rand() );
 
     // Create file mapping object
-    HANDLE hMapFile = CreateFileMappingW(
+    HANDLE hMapFile = CreateFileMappingA(
             INVALID_HANDLE_VALUE,// Use paging file
             NULL,                // Default security attributes
             PAGE_READWRITE,      // Read/write access
@@ -264,18 +443,15 @@ nxai_shm_t nxai_shm_create_random( size_t size ) {
 nxai_shm_t nxai_shm_create( const char *path, int project_id, size_t size ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    wchar_t wPath[MAX_PATH];
-    mbstowcs_s( NULL, wPath, MAX_PATH, path, _TRUNCATE );
-
     nxai_shm_t new_shm;
-    swprintf_s( new_shm.key, MAX_PATH, L"\\\\\\.\\Global\\SHM_%S_%d", wPath, project_id );
+    sprintf_s( new_shm.key, MAX_PATH, L"\\\\\\.\\Global\\SHM_%S_%d", path, project_id );
 
     SECURITY_ATTRIBUTES saAttr;
     saAttr.nLength = sizeof( SECURITY_ATTRIBUTES );
     saAttr.bInheritHandle = TRUE;
     saAttr.lpSecurityDescriptor = NULL;
 
-    new_shm.id = CreateFileMappingW(
+    new_shm.id = CreateFileMappingA(
             INVALID_HANDLE_VALUE,// Use paging file
             &saAttr,             // Security attributes
             PAGE_READWRITE,      // Read/write access
