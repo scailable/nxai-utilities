@@ -127,7 +127,7 @@ void nxai_ensure_child_cleanup() {
 #endif
 }
 
-void nxai_sleep( int milliseconds ) {
+void nxai_sleep_ms( int milliseconds ) {
 #if defined( _MSC_VER )
     // Windows implementation
     Sleep( milliseconds );

@@ -66,6 +66,20 @@ char *nxai_shm_id_to_string( nxai_shm_t shm ) {
     return id_string;
 }
 
+nxai_shm_t nxai_shm_id_from_string( const char *str ) {
+    nxai_shm_t shm;
+
+#if defined( _MSC_VER )
+    // Windows implementation
+    sscanf( str, "%p", &shm.id );
+#else
+    // Linux implementation
+    shm.id = atoi( str );
+#endif
+
+    return shm;
+}
+
 char *nxai_pipe_to_string( nxai_pipe_t pipe ) {
 #if defined( _MSC_VER )
     // Windows implementation

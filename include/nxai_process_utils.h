@@ -58,7 +58,7 @@ bool nxai_thread_create( nxai_thread_t *thread, function_ptr function, void *inp
  */
 void nxai_ensure_child_cleanup();
 
-void nxai_sleep( int milliseconds );
+void nxai_sleep_ms( int milliseconds );
 
 uint64_t nxai_current_timestamp_ms();
 
