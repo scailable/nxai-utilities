@@ -16,6 +16,8 @@ typedef HANDLE nxai_pipe_t;
 typedef DWORD nxai_process_t;
 typedef HANDLE nxai_thread_t;
 typedef HANDLE nxai_mutex_t;
+typedef unsigned long nxai_thread_return_t;
+#define NXAI_THREAD_RETURN 0
 #else
 // Linux specific imports
 #include <spawn.h>
@@ -23,6 +25,8 @@ typedef HANDLE nxai_mutex_t;
 typedef int nxai_pipe_t;
 typedef pid_t nxai_process_t;
 typedef pthread_t nxai_thread_t;
+typedef void *nxai_thread_return_t;
+#define NXAI_THREAD_RETURN NULL
 #endif
 
 #include <stdarg.h>
@@ -41,7 +45,11 @@ void nxai_chmod( const char *filepath, int mode );
 
 void nxai_thread_join( nxai_thread_t *thread );
 
+#ifdef _MSC_VER
 typedef unsigned long ( *function_ptr )( void * );
+#else
+typedef void *( *function_ptr )( void * );
+#endif
 bool nxai_thread_create( nxai_thread_t *thread, function_ptr function, void *input_arguments );
 
 /**
