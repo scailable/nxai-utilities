@@ -47,11 +47,15 @@ typedef enum {
 
 char *nxai_shm_key_to_string( nxai_shm_t shm );
 
+void nxai_shm_string_to_key( nxai_shm_t *result, const char *str );
+
 char *nxai_shm_id_to_string( nxai_shm_t shm );
 
 nxai_shm_t nxai_shm_id_from_string( const char *str );
 
 char *nxai_pipe_to_string( nxai_pipe_t pipe );
+
+nxai_pipe_t nxai_string_to_pipe( const char *str );
 
 nxai_pipe_t nxai_pipe_get_write_pipe( bidirectional_pipe_t pipe, PIPE_DIRECTION direction );
 

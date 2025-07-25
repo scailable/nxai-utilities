@@ -21,6 +21,7 @@
 #include <io.h>
 #include <tchar.h>
 #include <strsafe.h>
+#include <direct.h>
 #else
 // Linux specific imports
 #include <spawn.h>
@@ -124,6 +125,16 @@ void nxai_ensure_child_cleanup() {
 #else
     // Linux implementation
     prctl( PR_SET_PDEATHSIG, SIGTERM );
+#endif
+}
+
+void nxai_chdir( const char *path ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    int result = _chdir( path );
+#else
+    // Linux implementation
+    chdir( path );
 #endif
 }
 
@@ -700,5 +711,29 @@ nxai_mutex_t nxai_initialize_mutex() {
     // Linux implementation using pthread_mutex_t
     static pthread_mutex_t new_mutex = PTHREAD_MUTEX_INITIALIZER;
     return new_mutex;
+#endif
+}
+
+void nxai_process_set_sigs( nxai_handler_return_t ( *handler )( nxai_signal_t ) ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    // Set up console control handler
+    SetConsoleCtrlHandler( handler, TRUE );
+
+    // Windows doesn't have direct SIGPIPE equivalent
+    // Instead, we'll handle write failures in the code where they occur
+#else
+    // Linux implementation
+    signal( SIGINT, handler );
+    signal( SIGTERM, handler );
+    signal( SIGQUIT, handler );
+    signal( SIGABRT, handler );
+
+    // We expect write failures to occur but we want to handle them where
+    // the error occurs rather than in a SIGPIPE handler.
+    signal( SIGPIPE, SIG_IGN );
+
+    // Set death signal when parent is terminated
+    nxai_ensure_child_cleanup();
 #endif
 }

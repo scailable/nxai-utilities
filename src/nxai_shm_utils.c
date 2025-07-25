@@ -53,6 +53,26 @@ char *nxai_shm_key_to_string( nxai_shm_t shm ) {
     return shm_string;
 }
 
+void nxai_shm_string_to_key( nxai_shm_t *result, const char *str ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    // Convert string to integer using atoi
+    strcpy( result->key, str );
+#else
+    // Linux implementation
+    // Convert string to integer using strtol for better error handling
+    char *endptr;
+    errno = 0;
+    result->key = strtol( str, &endptr, 10 );
+
+    // Check for errors
+    if ( errno == ERANGE || *endptr != '\0' ) {
+        // Handle conversion error
+        result->key = 0;
+    }
+#endif
+}
+
 char *nxai_shm_id_to_string( nxai_shm_t shm ) {
 #if defined( _MSC_VER )
     // Windows implementation
@@ -90,6 +110,44 @@ char *nxai_pipe_to_string( nxai_pipe_t pipe ) {
     char *pipe_string = (char *) sclbl_itoa( input_pipe.up_pipe[0] );
 #endif
     return pipe_string;
+}
+
+nxai_pipe_t nxai_string_to_pipe( const char *str ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    HANDLE hPipe = INVALID_HANDLE_VALUE;
+
+    // Parse hex string representation of handle
+    sscanf_s( str, "%p", &hPipe );
+
+    // Validate the handle
+    DWORD dflags;
+    if ( hPipe == INVALID_HANDLE_VALUE || !GetHandleInformation( hPipe, &dflags ) ) {
+        return INVALID_HANDLE_VALUE;
+    }
+
+    return hPipe;
+#else
+    // Linux implementation
+    int pipe_fd;
+
+    // Convert string to integer
+    char *endptr;
+    pipe_fd = strtol( str, &endptr, 10 );
+
+    // Validate the conversion
+    if ( *endptr != '\0' || pipe_fd < 0 ) {
+        return -1;
+    }
+
+    // Verify it's a valid pipe
+    struct stat sb;
+    if ( fstat( pipe_fd, &sb ) == -1 || !S_ISFIFO( sb.st_mode ) ) {
+        return -1;
+    }
+
+    return pipe_fd;
+#endif
 }
 
 nxai_pipe_t nxai_pipe_get_write_pipe( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
