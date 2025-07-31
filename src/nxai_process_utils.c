@@ -81,6 +81,97 @@ void nxai_thread_join( nxai_thread_t *thread ) {
 #endif
 }
 
+/**
+ * Combines multiple path components into a single path string.
+ * Uses forward slashes on Unix-like systems and backslashes on Windows.
+ * The first path component is passed explicitly, remaining components via ...
+ *
+ * N.B. Last argument to thus function must always be NULL
+ * @param path First component of the path
+ * @param ... Variable number of additional path components
+ * @return A newly allocated string containing the joined path
+ */
+char *nxai_path_join( char *path, ... ) {
+// Add separator
+#if defined( _MSC_VER )
+    // Windows implementation
+    char separator = '\\';
+#else
+    // Linux implementation
+    char separator = '/';
+#endif
+
+    va_list args;
+    char *result = NULL;
+    size_t total_length = strlen( path );
+    size_t path_length = total_length;
+    if ( path[path_length - 1] != separator ) {
+        total_length += 1;
+    }
+
+    // First pass: calculate total length
+    va_start( args, path );
+    const char *arg = va_arg( args, const char * );
+
+    while ( arg != NULL ) {
+        size_t arg_length = strlen( arg );
+        total_length += arg_length;
+
+        if ( arg[arg_length - 1] != separator ) {
+            total_length += 1;// Add space for separator
+        }
+        arg = va_arg( args, const char * );
+    }
+
+    va_end( args );
+
+    // Allocate memory for result
+    result = malloc( total_length + 1 );
+    if ( !result ) {
+        return NULL;
+    }
+
+    // Copy first path component
+    memcpy( result, path, path_length );
+    char *current_pos = result + path_length;
+    if ( path[path_length - 1] != separator ) {
+        result[path_length] = separator;
+        current_pos++;
+    }
+
+    // Second pass: construct remaining path
+    va_start( args, path );
+    arg = va_arg( args, const char * );
+
+    bool separator_added = false;
+    while ( arg != NULL ) {
+        size_t arg_length = strlen( arg );
+
+        // Copy argument
+        memcpy( current_pos, arg, arg_length );
+        current_pos += arg_length;
+
+        if ( arg[arg_length - 1] != separator ) {
+            *current_pos = separator;
+            current_pos++;
+            separator_added = true;
+        } else {
+            separator_added = false;
+        }
+
+        arg = va_arg( args, const char * );
+    }
+    if ( separator_added == true ) {
+        // Ensure no trailing separator
+        current_pos--;
+    }
+
+    va_end( args );
+    *current_pos = '\0';// Null terminate
+
+    return result;
+}
+
 bool nxai_thread_create( nxai_thread_t *thread, function_ptr function, void *input_arguments ) {
 #if defined( _MSC_VER )
     // Windows implementation
@@ -248,6 +339,20 @@ void nxai_vlog_verbose( const char *fmt, ... ) {
     }
 }
 
+void nxai_error_log( const char *fmt, ... ) {
+    va_list args;
+
+    // First, process arguments for stderr printing
+    va_start( args, fmt );
+    vfprintf( stderr, fmt, args );
+    va_end( args );
+
+    // Make a copy of the arguments for nxai_vvlog
+    va_copy( args, args );
+    nxai_vvlog( fmt, &args );
+    va_end( args );
+}
+
 void nxai_vlog( const char *fmt, ... ) {
     va_list args;
     va_start( args, fmt );
@@ -402,10 +507,41 @@ bool nxai_process_started( nxai_process_t process ) {
     return true;
 }
 
+static char *convert_input_arguments( char *const argv[] ) {
+    // Determine length of string
+    int index = 0;
+    size_t string_length = 0;
+    while ( argv[index] != NULL ) {
+        string_length += strlen( argv[index] ) + 1;
+        index++;
+        if ( index == 1024 ) {
+            nxai_vlog( "Too many input arguments! Array needs to be terminated with a NULL pointer.\n" );
+            return NULL;
+        }
+    }
+    if ( string_length == 0 ) {
+        nxai_vlog( "Error! Argument string length is 0.\n" );
+        return NULL;
+    }
+    // Alloc string
+    char *argument_string = malloc( string_length * sizeof( char ) );
+    // Generate string
+    index = 0;
+    size_t current_index = 0;
+    while ( argv[index] != NULL ) {
+        size_t arg_length = strlen( argv[index] );
+        memcpy( &( argument_string[current_index] ), argv[index], arg_length );
+        current_index += arg_length;
+        argument_string[current_index++] = ' ';
+        index++;
+    }
+    argument_string[current_index - 1] = 0;
+    return argument_string;
+}
+
 nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxai_pipe_t *stderr_pipe ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    // Create pipe for stderr redirection
     SECURITY_ATTRIBUTES saAttr;
     saAttr.nLength = sizeof( SECURITY_ATTRIBUTES );
     saAttr.bInheritHandle = TRUE;
@@ -417,8 +553,8 @@ nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxa
     }
 
     // Set read end to non-blocking mode
-    DWORD dwFlagsAndAttributes = FILE_FLAG_OVERLAPPED;
-    if ( !SetNamedPipeHandleState( hReadPipe, &dwFlagsAndAttributes, NULL, NULL ) ) {
+    DWORD dwMode = PIPE_NOWAIT;// Use correct flag for non-blocking mode
+    if ( !SetNamedPipeHandleState( hReadPipe, &dwMode, NULL, NULL ) ) {
         CloseHandle( hReadPipe );
         CloseHandle( hWritePipe );
         return 1;
@@ -428,32 +564,39 @@ nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxa
     PROCESS_INFORMATION pi;
     ZeroMemory( &si, sizeof( si ) );
     ZeroMemory( &pi, sizeof( pi ) );
-
     si.cb = sizeof( si );
 
     if ( !connect_console ) {
-        // Redirect stdout to NUL (Windows equivalent of /dev/null)
         si.dwFlags |= STARTF_USESTDHANDLES;
         si.hStdOutput = INVALID_HANDLE_VALUE;
     }
 
-    // Setup stderr redirection
     si.dwFlags |= STARTF_USESTDHANDLES;
     si.hStdError = hWritePipe;
 
-    // Create the process
-    if ( !CreateProcessW( NULL, (wchar_t *) ( argv[0] ),
-                          NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi ) ) {
+    char *argument_string = convert_input_arguments( argv );
+
+    // Create process
+    if ( !CreateProcessA(
+                 NULL,           // lpApplicationName
+                 argument_string,// lpCommandLine
+                 NULL,           // lpProcessAttributes
+                 NULL,           // lpThreadAttributes
+                 TRUE,           // bInheritHandles
+                 0,              // dwCreationFlags
+                 NULL,           // lpEnvironment
+                 NULL,           // lpCurrentDirectory
+                 &si,            // lpStartupInfo
+                 &pi             // lpProcessInformation
+                 ) ) {
         CloseHandle( hReadPipe );
         CloseHandle( hWritePipe );
         return 1;
     }
 
-    // Cleanup
     CloseHandle( hWritePipe );// Child inherits this handle
     *stderr_pipe = hReadPipe;
     CloseHandle( pi.hThread );
-
     return pi.dwProcessId;
 #else
     // Linux implementation

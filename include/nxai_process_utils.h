@@ -55,6 +55,7 @@ typedef unsigned long ( *function_ptr )( void * );
 typedef void *( *function_ptr )( void * );
 #endif
 bool nxai_thread_create( nxai_thread_t *thread, function_ptr function, void *input_arguments );
+char *nxai_path_join( char *path, ... );
 
 /**
  * Ensures proper cleanup of child processes when the parent process terminates.
@@ -83,6 +84,8 @@ void nxai_initialize_logging( const char *start_log_filepath, const char *rotati
 void nxai_finalise_logging();
 
 void nxai_vlog_verbose( const char *fmt, ... );
+
+void nxai_error_log( const char *fmt, ... );
 
 void nxai_vlog( const char *fmt, ... );
 

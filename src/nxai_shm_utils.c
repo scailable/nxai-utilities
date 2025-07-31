@@ -100,11 +100,26 @@ nxai_shm_t nxai_shm_id_from_string( const char *str ) {
     return shm;
 }
 
+char *nxai_pointer_to_string( void *pointer ) {
+    char *pointer_string = malloc( 32 );// 32 bytes is typically enough for pointers
+    if ( pointer_string != NULL ) {
+        int len = snprintf( pointer_string, 32, "%p", pointer );
+        if ( len >= 32 ) {
+            // Handle truncation error
+            free( pointer_string );
+            pointer_string = malloc( len + 1 );
+            if ( pointer_string != NULL ) {
+                snprintf( pointer_string, len + 1, "%p", pointer );
+            }
+        }
+    }
+    return pointer_string;
+}
+
 char *nxai_pipe_to_string( nxai_pipe_t pipe ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    char *pipe_string = malloc( 20 );
-    sprintf( pipe_string, L"%p", pipe );
+    char *pipe_string = nxai_pointer_to_string( pipe );
 #else
     // Linux implementation
     char *pipe_string = (char *) sclbl_itoa( input_pipe.up_pipe[0] );
@@ -483,7 +498,7 @@ nxai_shm_t nxai_shm_create_random( size_t size ) {
     // Windows implementation
     // Generate random name for anonymous mapping
     nxai_shm_t new_shm;
-    sprintf_s( new_shm.key, MAX_PATH, L"\\\\\\.\\Global\\RandomSHM_%08X", rand() );
+    sprintf_s( new_shm.key, MAX_PATH, "\\\\\\.\\Global\\RandomSHM_%08X", rand() );
 
     // Create file mapping object
     HANDLE hMapFile = CreateFileMappingA(
