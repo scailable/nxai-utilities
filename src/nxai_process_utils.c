@@ -560,7 +560,7 @@ nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxa
         return 1;
     }
 
-    STARTUPINFOW si;
+    STARTUPINFOA si;
     PROCESS_INFORMATION pi;
     ZeroMemory( &si, sizeof( si ) );
     ZeroMemory( &pi, sizeof( pi ) );
