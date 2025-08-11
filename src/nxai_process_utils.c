@@ -91,7 +91,7 @@ void nxai_thread_join( nxai_thread_t *thread ) {
  * @param ... Variable number of additional path components
  * @return A newly allocated string containing the joined path
  */
-char *nxai_path_join( char *path, ... ) {
+char *_nxai_path_join( int arg_count, const char *path, ... ) {
 // Add separator
 #if defined( _MSC_VER )
     // Windows implementation
@@ -113,7 +113,7 @@ char *nxai_path_join( char *path, ... ) {
     va_start( args, path );
     const char *arg = va_arg( args, const char * );
 
-    while ( arg != NULL ) {
+    for ( size_t arg_index = 0; arg_index < arg_count; arg_index++ ) {
         size_t arg_length = strlen( arg );
         total_length += arg_length;
 
@@ -144,7 +144,7 @@ char *nxai_path_join( char *path, ... ) {
     arg = va_arg( args, const char * );
 
     bool separator_added = false;
-    while ( arg != NULL ) {
+    for ( size_t arg_index = 0; arg_index < arg_count; arg_index++ ) {
         size_t arg_length = strlen( arg );
 
         // Copy argument
