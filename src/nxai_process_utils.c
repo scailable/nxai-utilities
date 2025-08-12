@@ -71,7 +71,7 @@ void nxai_chmod( const char *filepath, int mode ) {
 #endif
 }
 
-void nxai_thread_join( nxai_thread_t *thread ) {
+void nxai_thread_join( nxai_thread_t thread ) {
 #if defined( _MSC_VER )
     // Windows implementation
     WaitForSingleObject( thread, INFINITE );
@@ -178,7 +178,7 @@ bool nxai_thread_create( nxai_thread_t *thread, function_ptr function, void *inp
     DWORD dwThreadIdArray;
 
     // Create the thread to begin execution on its own.
-    thread = CreateThread(
+    *thread = CreateThread(
             NULL,              // default security attributes
             0,                 // use default stack size
             function,          // thread function name
@@ -187,7 +187,7 @@ bool nxai_thread_create( nxai_thread_t *thread, function_ptr function, void *inp
             &dwThreadIdArray );// returns the thread identifier
 
     // Check the return value for success.
-    if ( thread == NULL ) {
+    if ( *thread == NULL ) {
         nxai_vlog( "Could not create thread!\n" );
         return false;
     }

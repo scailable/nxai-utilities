@@ -80,7 +80,7 @@ int nxai_strcasecmp( const char *str1, const char *str2 );
 
 void nxai_chmod( const char *filepath, int mode );
 
-void nxai_thread_join( nxai_thread_t *thread );
+void nxai_thread_join( nxai_thread_t thread );
 
 #ifdef _MSC_VER
 typedef unsigned long ( *function_ptr )( void * );
