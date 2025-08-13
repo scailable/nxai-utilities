@@ -32,6 +32,7 @@ typedef SSIZE_T ssize_t;
 #include <sys/shm.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <poll.h>
 #endif
 
 #include "nxai_process_utils.h"
@@ -122,7 +123,7 @@ char *nxai_pipe_to_string( nxai_pipe_t pipe ) {
     char *pipe_string = nxai_pointer_to_string( pipe );
 #else
     // Linux implementation
-    char *pipe_string = (char *) sclbl_itoa( input_pipe.up_pipe[0] );
+    char *pipe_string = (char *) sclbl_itoa( pipe );
 #endif
     return pipe_string;
 }

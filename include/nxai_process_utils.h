@@ -4,6 +4,10 @@
 extern "C" {
 #endif
 
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdint.h>
+
 #if defined( _MSC_VER )
 // Windows specific imports
 #define NOMINMAX//< Needed to prevent windows.h define macros min() and max().
@@ -27,15 +31,12 @@ typedef BOOL nxai_handler_return_t;
 typedef int nxai_pipe_t;
 typedef pid_t nxai_process_t;
 typedef pthread_t nxai_thread_t;
+typedef pthread_mutex_t nxai_mutex_t;
 typedef void *nxai_thread_return_t;
 #define NXAI_THREAD_RETURN NULL
 typedef int32_t nxai_signal_t;
 typedef void nxai_handler_return_t;
 #endif
-
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stdint.h>
 
 #ifdef NXAI_DEBUG
 #define debug_vlog( fmt, args... ) nxai_vlog( fmt, ##args )

@@ -45,7 +45,7 @@ void *nxai_load_library_with_namespace( const char *filename, int nsid ) {
                           LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS );
 #else
     // Unix/Linux implementation using dlmopen
-    return dlmopen( LM_ID_NEWNS, filename, RTLD_LAZY );
+    return dlmopen( -1, filename, RTLD_LAZY );
 #endif
 }
 

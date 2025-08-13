@@ -58,7 +58,13 @@ nxai_mutex_t rotating_logfile_lock;
 static void nxai_vvlog( const char *fmt, va_list *args );
 
 int nxai_strcasecmp( const char *str1, const char *str2 ) {
+#if defined( _MSC_VER )
+    // Windows implementation
     return _stricmp( str1, str2 );
+#else
+    // Linux implementation
+    return strcasecmp( str1, str2 );
+#endif
 }
 
 void nxai_chmod( const char *filepath, int mode ) {
@@ -77,7 +83,7 @@ void nxai_thread_join( nxai_thread_t thread ) {
     WaitForSingleObject( thread, INFINITE );
 #else
     // Linux implementation
-    pthread_join( thread );
+    pthread_join( thread, NULL );
 #endif
 }
 
@@ -741,6 +747,8 @@ char *nxai_read_pipe_to_string( nxai_pipe_t pipe ) {
 }
 
 int nxai_kill_process( nxai_process_t process ) {
+#if defined( _MSC_VER )
+    // Windows implementation
 
     HANDLE hProcess = OpenProcess( PROCESS_TERMINATE | PROCESS_QUERY_INFORMATION,
                                    FALSE, process );
@@ -755,6 +763,10 @@ int nxai_kill_process( nxai_process_t process ) {
     }
 
     CloseHandle( hProcess );
+#else
+    // Linux implementation
+    kill( process, SIGTERM );
+#endif
 }
 
 int nxai_shutdown_process( nxai_process_t process ) {
