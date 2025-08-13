@@ -88,7 +88,7 @@ typedef unsigned long ( *function_ptr )( void * );
 #else
 typedef void *( *function_ptr )( void * );
 #endif
-char *_nxai_path_join( int arg_count, const char *path, ... );
+char *_nxai_path_join( int arg_count, ... );
 bool nxai_thread_create( nxai_thread_t *thread, function_ptr function, void *input_arguments );
 
 /**

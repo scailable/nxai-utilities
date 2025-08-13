@@ -49,7 +49,7 @@ char *nxai_shm_key_to_string( nxai_shm_t shm ) {
     char *shm_string = malloc( strlen( shm.key ) );
 #else
     // Linux implementation
-    char *shm_string = (char *) sclbl_itoa( shm.key );
+    char *shm_string = nxai_sprintf( 32, "%d", shm.key );
 #endif
     return shm_string;
 }
@@ -82,7 +82,7 @@ char *nxai_shm_id_to_string( nxai_shm_t shm ) {
     sprintf( id_string, L"%p", shm.id );
 #else
     // Linux implementation
-    char *id_string = (char *) sclbl_itoa( shm.id );
+    char *id_string = nxai_sprintf( 32, "%d", shm.id );
 #endif
     return id_string;
 }
@@ -101,20 +101,41 @@ nxai_shm_t nxai_shm_id_from_string( const char *str ) {
     return shm;
 }
 
-char *nxai_pointer_to_string( void *pointer ) {
-    char *pointer_string = malloc( 32 );// 32 bytes is typically enough for pointers
-    if ( pointer_string != NULL ) {
-        int len = snprintf( pointer_string, 32, "%p", pointer );
-        if ( len >= 32 ) {
-            // Handle truncation error
-            free( pointer_string );
-            pointer_string = malloc( len + 1 );
-            if ( pointer_string != NULL ) {
-                snprintf( pointer_string, len + 1, "%p", pointer );
-            }
-        }
+char *nxai_sprintf( size_t initial_size, char *fmt, ... ) {
+    // Initial allocation
+    char *return_string = malloc( initial_size );
+    if ( !return_string ) {
+        return NULL;
     }
-    return pointer_string;
+
+    va_list args;
+    va_start( args, fmt );
+
+    // First attempt to format string
+    size_t len = vsnprintf( return_string, initial_size, fmt, args );
+    va_end( args );
+
+    // Check if buffer was too small
+    if ( len >= initial_size ) {
+        // Need larger buffer
+        return_string = realloc( return_string, len + 1 );
+        if ( !return_string ) {
+            return NULL;
+        }
+
+        // Restart va_list for second formatting attempt
+        va_start( args, fmt );
+
+        // Format string again with larger buffer
+        vsnprintf( return_string, len + 1, fmt, args );
+        va_end( args );
+    }
+
+    return return_string;
+}
+
+char *nxai_pointer_to_string( void *pointer ) {
+    return nxai_sprintf( 32, "%p", pointer );// 32 bytes is typically enough for pointers
 }
 
 char *nxai_pipe_to_string( nxai_pipe_t pipe ) {
@@ -123,7 +144,7 @@ char *nxai_pipe_to_string( nxai_pipe_t pipe ) {
     char *pipe_string = nxai_pointer_to_string( pipe );
 #else
     // Linux implementation
-    char *pipe_string = (char *) sclbl_itoa( pipe );
+    char *pipe_string = nxai_sprintf( 32, "%d", pipe );
 #endif
     return pipe_string;
 }

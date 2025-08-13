@@ -53,6 +53,8 @@ char *nxai_shm_id_to_string( nxai_shm_t shm );
 
 nxai_shm_t nxai_shm_id_from_string( const char *str );
 
+char *nxai_sprintf( size_t initial_size, char *fmt, ... );
+
 char *nxai_pipe_to_string( nxai_pipe_t pipe );
 
 nxai_pipe_t nxai_string_to_pipe( const char *str );

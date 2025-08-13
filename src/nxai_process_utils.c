@@ -97,7 +97,7 @@ void nxai_thread_join( nxai_thread_t thread ) {
  * @param ... Variable number of additional path components
  * @return A newly allocated string containing the joined path
  */
-char *_nxai_path_join( int arg_count, const char *path, ... ) {
+char *_nxai_path_join( int arg_count, ... ) {
 // Add separator
 #if defined( _MSC_VER )
     // Windows implementation
@@ -109,14 +109,10 @@ char *_nxai_path_join( int arg_count, const char *path, ... ) {
 
     va_list args;
     char *result = NULL;
-    size_t total_length = strlen( path );
-    size_t path_length = total_length;
-    if ( path[path_length - 1] != separator ) {
-        total_length += 1;
-    }
+    size_t total_length = 0;
 
     // First pass: calculate total length
-    va_start( args, path );
+    va_start( args, arg_count );
     const char *arg = va_arg( args, const char * );
 
     for ( size_t arg_index = 0; arg_index < arg_count; arg_index++ ) {
@@ -136,17 +132,10 @@ char *_nxai_path_join( int arg_count, const char *path, ... ) {
     if ( !result ) {
         return NULL;
     }
-
-    // Copy first path component
-    memcpy( result, path, path_length );
-    char *current_pos = result + path_length;
-    if ( path[path_length - 1] != separator ) {
-        result[path_length] = separator;
-        current_pos++;
-    }
+    char *current_pos = result;
 
     // Second pass: construct remaining path
-    va_start( args, path );
+    va_start( args, arg_count );
     arg = va_arg( args, const char * );
 
     bool separator_added = false;
