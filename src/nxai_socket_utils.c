@@ -1,5 +1,7 @@
 #include "nxai_socket_utils.h"
 
+#include "nxai_process_utils.h"
+
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -150,32 +152,29 @@ int nxai_socket_create_listener( const char *socket_path ) {
     // Windows implementation
     SOCKET socket_fd = INVALID_SOCKET;
 
+    // Convert Windows-style path to Unix-style path
+    wchar_t wpath[MAX_PATH];
+    MultiByteToWideChar( CP_UTF8, 0, socket_path, -1, wpath, MAX_PATH );
+
     // Create socket to listen on
-    socket_fd = WSASocketW( AF_UNIX, SOCK_STREAM, 0, NULL, 0, 0 );
+    socket_fd = WSASocketA( AF_UNIX, SOCK_STREAM, 0, NULL, 0, 0 );
     if ( socket_fd == INVALID_SOCKET ) {
         errno = win32_error_to_errno( WSAGetLastError() );
         printf( "Error: Sender socket error.\n" );
         return -1;
     }
 
-    // Convert path to wide characters
-    wchar_t wpath[MAX_PATH];
-    MultiByteToWideChar( CP_UTF8, 0, socket_path, -1, wpath, MAX_PATH );
-
-    // Remove existing socket file
-    DeleteFileW( wpath );
-
     // Set up address structure
     struct sockaddr_un addr;
     memset( &addr, 0, sizeof( addr ) );
     addr.sun_family = AF_UNIX;
-    wcscpy_s( (wchar_t *) addr.sun_path, MAX_PATH, wpath );
+    strncpy( addr.sun_path, wpath, sizeof( addr.sun_path ) - 1 );
 
     // Bind to socket
     if ( bind( socket_fd, (struct sockaddr *) &addr, sizeof( struct sockaddr_un ) ) == SOCKET_ERROR ) {
         closesocket( socket_fd );
         errno = win32_error_to_errno( WSAGetLastError() );
-        printf( "Error: Sender socket bind error.\n" );
+        nxai_vlog( "Error: Sender socket bind error.\n" );
         return -1;
     }
 
@@ -189,7 +188,7 @@ int nxai_socket_create_listener( const char *socket_path ) {
     if ( listen( socket_fd, SOMAXCONN ) == SOCKET_ERROR ) {
         closesocket( socket_fd );
         errno = win32_error_to_errno( WSAGetLastError() );
-        printf( "Error: Sender socket listen error.\n" );
+        nxai_vlog( "Error: Sender socket listen error.\n" );
         return -1;
     }
 
