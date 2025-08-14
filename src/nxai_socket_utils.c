@@ -469,7 +469,7 @@ int32_t nxai_socket_connect( const char *socket_path ) {
     // Create new socket
     socket_fd = WSASocketW( AF_UNIX, SOCK_STREAM, 0, NULL, 0, 0 );
     if ( socket_fd == INVALID_SOCKET ) {
-        printf( "Warning: socket() creation failed\n" );
+        nxai_vlog( "Warning: socket() creation failed\n" );
         return -1;
     }
 
@@ -483,22 +483,12 @@ int32_t nxai_socket_connect( const char *socket_path ) {
     memset( &addr, 0, sizeof( struct sockaddr_un ) );
     addr.sun_family = AF_UNIX;
 
-    // Convert path to wide characters for Windows
-    wchar_t wpath[MAX_PATH];
-    MultiByteToWideChar( CP_UTF8, 0, socket_path, -1, wpath, MAX_PATH );
-    wcscpy_s( (wchar_t *) addr.sun_path, MAX_PATH, wpath );
-
-    // Check if we have access to socket
-    DWORD attrs = GetFileAttributesW( wpath );
-    if ( attrs == INVALID_FILE_ATTRIBUTES ) {
-        printf( "Warning: access to socket failed at %s\n", socket_path );
-        closesocket( socket_fd );
-        return -1;
-    }
+    // Copy narrow path directly
+    strncpy_s( addr.sun_path, sizeof( addr.sun_path ), socket_path, _TRUNCATE );
 
     // Connect to socket
     if ( connect( socket_fd, (struct sockaddr *) &addr, sizeof( struct sockaddr_un ) ) == SOCKET_ERROR ) {
-        printf( "Warning: connect to socket [%s] failed: %d\n", socket_path, WSAGetLastError() );
+        nxai_vlog( "Warning: connect to socket [%s] failed: %d\n", socket_path, WSAGetLastError() );
         closesocket( socket_fd );
         return -1;
     }
