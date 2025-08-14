@@ -107,7 +107,6 @@ mpack_tree_t *copy_yyjson_to_mpack( yyjson_val *input_object ) {
     mpack_writer_init_growable( &writer, &new_buffer, &buffer_length );
     // Recursively write all values from input object to writer
     bool success = _copy_yyjson_to_mpack_recursive( input_object, &writer );
-    mpack_finish_map( &writer );
     if ( mpack_writer_destroy( &writer ) != mpack_ok || success == false ) {
         nxai_vlog( "Problem writing data: %s\n", mpack_error_to_string( mpack_writer_error( &writer ) ) );
         return NULL;
