@@ -150,17 +150,22 @@ uint32_t nxai_socket_send_receive_message( const char *socket_path, const char *
 int nxai_socket_create_listener( const char *socket_path ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    SOCKET socket_fd = INVALID_SOCKET;
 
-    // Convert Windows-style path to Unix-style path
+    SOCKET socket_fd = INVALID_SOCKET;
+    char unix_path[MAX_PATH];
+
+    // Convert Windows path to Unix-style path
     wchar_t wpath[MAX_PATH];
     MultiByteToWideChar( CP_UTF8, 0, socket_path, -1, wpath, MAX_PATH );
+
+    // Convert back to narrow string with Unix-style path
+    WideCharToMultiByte( CP_UTF8, 0, wpath, -1, unix_path, MAX_PATH, NULL, NULL );
 
     // Create socket to listen on
     socket_fd = WSASocketA( AF_UNIX, SOCK_STREAM, 0, NULL, 0, 0 );
     if ( socket_fd == INVALID_SOCKET ) {
         errno = win32_error_to_errno( WSAGetLastError() );
-        printf( "Error: Sender socket error.\n" );
+        nxai_vlog( "Error: Sender socket error.\n" );
         return -1;
     }
 
@@ -168,7 +173,7 @@ int nxai_socket_create_listener( const char *socket_path ) {
     struct sockaddr_un addr;
     memset( &addr, 0, sizeof( addr ) );
     addr.sun_family = AF_UNIX;
-    strncpy( addr.sun_path, wpath, sizeof( addr.sun_path ) - 1 );
+    strncpy( addr.sun_path, unix_path, sizeof( addr.sun_path ) - 1 );
 
     // Bind to socket
     if ( bind( socket_fd, (struct sockaddr *) &addr, sizeof( struct sockaddr_un ) ) == SOCKET_ERROR ) {
