@@ -537,23 +537,6 @@ static char *convert_input_arguments( char *const argv[] ) {
 nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxai_pipe_t *stderr_pipe ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    SECURITY_ATTRIBUTES saAttr;
-    saAttr.nLength = sizeof( SECURITY_ATTRIBUTES );
-    saAttr.bInheritHandle = TRUE;
-    saAttr.lpSecurityDescriptor = NULL;
-
-    HANDLE hReadPipe, hWritePipe;
-    if ( !CreatePipe( &hReadPipe, &hWritePipe, &saAttr, 0 ) ) {
-        return 1;
-    }
-
-    // Set read end to non-blocking mode
-    DWORD dwMode = PIPE_NOWAIT;// Use correct flag for non-blocking mode
-    if ( !SetNamedPipeHandleState( hReadPipe, &dwMode, NULL, NULL ) ) {
-        CloseHandle( hReadPipe );
-        CloseHandle( hWritePipe );
-        return 1;
-    }
 
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
@@ -567,9 +550,10 @@ nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxa
     }
 
     si.dwFlags |= STARTF_USESTDHANDLES;
-    si.hStdError = hWritePipe;
 
     char *argument_string = convert_input_arguments( argv );
+
+    nxai_vlog( "Arg string: %s\n", argument_string );
 
     // Create process
     if ( !CreateProcessA(
@@ -584,13 +568,9 @@ nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxa
                  &si,            // lpStartupInfo
                  &pi             // lpProcessInformation
                  ) ) {
-        CloseHandle( hReadPipe );
-        CloseHandle( hWritePipe );
         return 1;
     }
 
-    CloseHandle( hWritePipe );// Child inherits this handle
-    *stderr_pipe = hReadPipe;
     CloseHandle( pi.hThread );
     return pi.dwProcessId;
 #else
