@@ -57,6 +57,21 @@ nxai_mutex_t rotating_logfile_lock;
 
 static void nxai_vvlog( const char *fmt, va_list *args );
 
+#include <windows.h>
+
+#if defined( _MSC_VER )
+void get_windows_error( DWORD errorCode, char *buffer, DWORD bufferSize ) {
+    FormatMessageA(
+            FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL,
+            errorCode,
+            MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),
+            buffer,
+            bufferSize,
+            NULL );
+}
+#endif
+
 int nxai_strcasecmp( const char *str1, const char *str2 ) {
 #if defined( _MSC_VER )
     // Windows implementation

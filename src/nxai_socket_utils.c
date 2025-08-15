@@ -63,7 +63,7 @@ int nxai_socket_initialize_sockets() {
     WSADATA wsaData;
     int result = WSAStartup( MAKEWORD( 2, 2 ), &wsaData );
     if ( result != 0 ) {
-        printf( "WSAStartup failed: %d\n", result );
+        nxai_vlog( "WSAStartup failed: %d\n", result );
         return 1;
     }
 #endif
@@ -164,8 +164,9 @@ int nxai_socket_create_listener( const char *socket_path ) {
     // Create socket to listen on
     socket_fd = WSASocketA( AF_UNIX, SOCK_STREAM, 0, NULL, 0, 0 );
     if ( socket_fd == INVALID_SOCKET ) {
-        errno = win32_error_to_errno( WSAGetLastError() );
-        nxai_vlog( "Error: Sender socket error.\n" );
+        char error_string[1024];
+        get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Sender socket error: %s\n", error_string );
         return -1;
     }
 

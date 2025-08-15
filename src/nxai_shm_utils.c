@@ -261,78 +261,39 @@ size_t nxai_pipe_poll( bidirectional_pipe_t *pipes_array, size_t pipes_length, P
 
 #if defined( _MSC_VER )
     // Windows implementation
-    // Allocate array for OVERLAPPED structures
-    OVERLAPPED *overlapped_array = (OVERLAPPED *) malloc( sizeof( OVERLAPPED ) * pipes_length );
 
-    // Initialize OVERLAPPED structures
-    for ( size_t index = 0; index < pipes_length; index++ ) {
-        ZeroMemory( &overlapped_array[index], sizeof( OVERLAPPED ) );
-        overlapped_array[index].hEvent = CreateEvent( NULL, TRUE, FALSE, NULL );
-        if ( overlapped_array[index].hEvent == NULL ) {
-            // Clean up previously allocated events
-            for ( size_t i = 0; i < index; i++ ) {
-                CloseHandle( overlapped_array[i].hEvent );
-            }
-            free( overlapped_array );
-            return pipes_length;
-        }
-    }
-
-    nxai_vlog( "Waiting for output from any inference engine.\n" );
-
-    // Wait for any pipe to have data
-    DWORD wait_result = WaitForMultipleObjects(
-            pipes_length,
-            (HANDLE *) overlapped_array,
-            FALSE,// Don't wait for all events
-            timeout_ms );
-
-    if ( wait_result == WAIT_FAILED ) {
-        DWORD last_error = GetLastError();
-        nxai_vlog( "Error! Could not poll inference engine pipe! %d\n", last_error );
-        fprintf( stderr, "\nError! Could not poll inference engine pipe! %d", last_error );
-        raise( SIGABRT );
-        free( overlapped_array );
+    HANDLE *handles_array = (HANDLE *) malloc( pipes_length * sizeof( HANDLE ) );
+    if ( !handles_array ) {
         return pipes_length;
     }
 
-    if ( wait_result == WAIT_TIMEOUT ) {
-        nxai_vlog( "Timed out waiting for client output\n" );
-        free( overlapped_array );
-        return pipes_length;
-    }
-
-    // Determine which inference engine signalled
-    size_t index;
-    for ( index = 0; index < pipes_length; index++ ) {
-        if ( wait_result == WAIT_OBJECT_0 + index ) {
-            // Pipe has data to read
-            DWORD bytesRead;
-            int8_t read_byte;
-            if ( !ReadFile(
-                         nxai_pipe_get_read_pipe( pipes_array[index], direction ),
-                         &read_byte,
-                         sizeof( read_byte ),
-                         &bytesRead,
-                         &overlapped_array[index] ) ) {
-                if ( GetLastError() != ERROR_IO_PENDING ) {
-                    nxai_vlog( "Error! Could not read from pipe %zu\n", index );
-                    fprintf( stderr, "\nError! Could not read from pipe %zu", index );
-                    raise( SIGABRT );
-                    free( overlapped_array );
-                    return pipes_length;
-                }
-            }
-            *return_byte = read_byte;
-            break;
-        }
-    }
-
-    // Clean up
+    // Fill the handles array based on direction
+    size_t handle_idx = 0;
     for ( size_t i = 0; i < pipes_length; i++ ) {
-        CloseHandle( overlapped_array[i].hEvent );
+        handles_array[i] = nxai_pipe_get_read_pipe( pipes_array[i], direction );
     }
-    free( overlapped_array );
+
+    // Wait for data on any pipe
+    DWORD wait_result = WaitForMultipleObjects( pipes_length, handles_array, FALSE, INFINITE );
+    if ( wait_result == WAIT_FAILED ) {
+        return pipes_length;
+    }
+
+    // Convert wait result to pipe index
+    size_t pipe_index = wait_result - WAIT_OBJECT_0;
+    if ( pipe_index >= pipes_length ) {
+        return pipes_length;
+    }
+
+    // Read single byte
+    DWORD bytes_read;
+    if ( !ReadFile( nxai_pipe_get_read_pipe( pipes_array[pipe_index], direction ),
+                    return_byte, 1, &bytes_read, NULL ) ) {
+        return pipes_length;
+    }
+
+    return pipe_index;
+
 #else
     // Linux implementation
 
@@ -344,15 +305,14 @@ size_t nxai_pipe_poll( bidirectional_pipe_t *pipes_array, size_t pipes_length, P
     }
 
     // Wait for any pipe to write data
-    nxai_vlog( "Waiting for output from any inference engine.\n" );
+    nxai_vlog( "Waiting for output from any pipe.\n" );
     int ready = poll( poll_fds, pipes_length, timeout_ms );
 
     if ( ready < 0 ) {
         free( poll_fds );
         if ( errno != EINTR ) {
             // Error is something other than receiving interrupt signal. Raise error
-            nxai_vlog( "Error! Could not poll inference engine pipe! %d %s\n", ready, strerror( errno ) );
-            fprintf( stderr, "\nError! Could not poll inference engine pipe! %d %s", ready, strerror( errno ) );
+            nxai_error_log( "\nError! Could not poll pipe! %d %s", ready, strerror( errno ) );
             raise( SIGABRT );
         }
         return pipes_length;
@@ -364,15 +324,14 @@ size_t nxai_pipe_poll( bidirectional_pipe_t *pipes_array, size_t pipes_length, P
         return pipes_length;
     }
 
-    // Determine which inference engine signalled
+    // Determine which pipe signalled
     size_t index;
     for ( index = 0; index < pipes_length; index++ ) {
         if ( poll_fds[index].revents & POLLIN ) {
             // Pipe has data to read. Read byte and clear flag
             int8_t read_byte = (int8_t) nxai_pipe_read( pipes_array[index], direction );
             if ( read_byte == -1 ) {
-                nxai_vlog( "Error! Could not read from pipe %zu\n", index );
-                fprintf( stderr, "\nError! Could not read from pipe %zu", index );
+                nxai_error_log( "\nError! Could not read from pipe %zu", index );
                 raise( SIGABRT );
                 free( poll_fds );
                 return pipes_length;
@@ -382,8 +341,7 @@ size_t nxai_pipe_poll( bidirectional_pipe_t *pipes_array, size_t pipes_length, P
             *return_byte = read_byte;
             break;
         } else if ( poll_fds[index].revents & POLLERR || poll_fds[index].revents & POLLHUP ) {
-            nxai_vlog( "Error! Failed to communicate with inference engine %zu\n", index );
-            fprintf( stderr, "\nError! Failed to communicate with inference engine %zu", index );
+            nxai_error_log( "\nError! Failed to communicate with pipe %zu", index );
             close( poll_fds[index].fd );
             poll_fds[index].fd = -1;
             raise( SIGABRT );
@@ -747,7 +705,7 @@ bool nxai_shm_realloc( nxai_shm_t *shm, size_t new_size ) {
     // Linux implementation
     // Remove old SHM
     if ( nxai_shm_destroy( shm ) != 0 ) {
-        fprintf( stderr, "Error! Could not destroy Shared Memory segment with ID %d.\n", shm->id );
+        nxai_error_log( "Error! Could not destroy Shared Memory segment with ID %d.\n", shm->id );
         return false;
     }
 
