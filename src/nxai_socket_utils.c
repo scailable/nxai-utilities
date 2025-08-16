@@ -178,9 +178,10 @@ int nxai_socket_create_listener( const char *socket_path ) {
 
     // Bind to socket
     if ( bind( socket_fd, (struct sockaddr *) &addr, sizeof( struct sockaddr_un ) ) == SOCKET_ERROR ) {
+        char error_string[1024];
+        get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Sender socket bind error: %s\n", error_string );
         closesocket( socket_fd );
-        errno = win32_error_to_errno( WSAGetLastError() );
-        nxai_vlog( "Error: Sender socket bind error.\n" );
         return -1;
     }
 
