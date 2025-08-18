@@ -26,6 +26,7 @@
 #include "windows.h"
 #include <basetsd.h>
 typedef SSIZE_T ssize_t;
+static volatile long PipeSerialNumber;
 #else
 // Linux stuff
 #include <sys/select.h>
@@ -211,25 +212,71 @@ bidirectional_pipe_t nxai_create_pipe( int *error ) {
     saAttr.bInheritHandle = TRUE;
     saAttr.lpSecurityDescriptor = NULL;
 
-    // Create up pipe
-    if ( !CreatePipe( &( created_pipe.up_pipe[0] ),
-                      &( created_pipe.up_pipe[1] ),
-                      &saAttr,
-                      0 ) ) {
-        *error = -1;
-        return created_pipe;
-    }
-
-    // Create down pipe
-    if ( !CreatePipe( &( created_pipe.down_pipe[0] ),
-                      &( created_pipe.down_pipe[1] ),
-                      &saAttr,
-                      0 ) ) {
-        CloseHandle( created_pipe.up_pipe[0] );
-        CloseHandle( created_pipe.up_pipe[1] );
+    // Create up pipe name
+    UCHAR UpPipeNameBuffer[MAX_PATH];
+    sprintf( UpPipeNameBuffer,
+             "\\\\.\\Pipe\\NXAI_MODULE_UP.%08x.%08x",
+             GetCurrentProcessId(),
+             InterlockedIncrement( &PipeSerialNumber ) );
+    HANDLE UpReadPipeHandle = CreateNamedPipeA(
+            UpPipeNameBuffer,
+            PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
+            PIPE_TYPE_BYTE | PIPE_WAIT,
+            1,  // Number of pipes
+            512,// Out buffer size
+            512,// In buffer size
+            0,  // Timeout in ms
+            &saAttr );
+    if ( !UpReadPipeHandle ) {
         *error = -2;
         return created_pipe;
     }
+
+    HANDLE UpWritePipeHandle = CreateFileA(
+            UpPipeNameBuffer,
+            GENERIC_WRITE,
+            0,// No sharing
+            &saAttr,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL// Template file
+    );
+
+    created_pipe.up_pipe[0] = UpReadPipeHandle;
+    created_pipe.up_pipe[1] = UpWritePipeHandle;
+
+    // Create down pipe name
+    UCHAR DownPipeNameBuffer[MAX_PATH];
+    sprintf( DownPipeNameBuffer,
+             "\\\\.\\Pipe\\NXAI_MODULE_DOWN.%08x.%08x",
+             GetCurrentProcessId(),
+             InterlockedIncrement( &PipeSerialNumber ) );
+    HANDLE DownReadPipeHandle = CreateNamedPipeA(
+            DownPipeNameBuffer,
+            PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
+            PIPE_TYPE_BYTE | PIPE_WAIT,
+            1,  // Number of pipes
+            512,// Out buffer size
+            512,// In buffer size
+            0,  // Timeout in ms
+            &saAttr );
+    if ( !DownReadPipeHandle ) {
+        *error = -2;
+        return created_pipe;
+    }
+
+    HANDLE DownWritePipeHandle = CreateFileA(
+            DownPipeNameBuffer,
+            GENERIC_WRITE,
+            0,// No sharing
+            &saAttr,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL// Template file
+    );
+
+    created_pipe.down_pipe[0] = DownReadPipeHandle;
+    created_pipe.down_pipe[1] = DownWritePipeHandle;
 
     *error = 0;
     return created_pipe;
@@ -262,37 +309,110 @@ size_t nxai_pipe_poll( bidirectional_pipe_t *pipes_array, size_t pipes_length, P
 #if defined( _MSC_VER )
     // Windows implementation
 
-    HANDLE *handles_array = (HANDLE *) malloc( pipes_length * sizeof( HANDLE ) );
-    if ( !handles_array ) {
+    // Validate parameters
+    if ( !pipes_array || !pipes_length || !return_byte ) {
+        raise( SIGABRT );
         return pipes_length;
     }
 
-    // Fill the handles array based on direction
-    size_t handle_idx = 0;
+    // Create array to store OVERLAPPED structures
+    OVERLAPPED *overlaps = (OVERLAPPED *) malloc( sizeof( OVERLAPPED ) * pipes_length );
+    if ( !overlaps ) {
+        raise( SIGABRT );
+        return pipes_length;
+    }
+
+    // Initialize OVERLAPPED structures
     for ( size_t i = 0; i < pipes_length; i++ ) {
-        handles_array[i] = nxai_pipe_get_read_pipe( pipes_array[i], direction );
+        ZeroMemory( &overlaps[i], sizeof( OVERLAPPED ) );
+        overlaps[i].hEvent = CreateEvent( NULL, TRUE, FALSE, NULL );
+        if ( !overlaps[i].hEvent ) {
+            // Cleanup previous events
+            for ( size_t j = 0; j < i; j++ ) {
+                CloseHandle( overlaps[j].hEvent );
+            }
+            free( overlaps );
+            raise( SIGABRT );
+            return pipes_length;
+        }
+    }
+    // Set up overlapped read operations
+    for ( size_t pipe_index = 0; pipe_index < pipes_length; pipe_index++ ) {
+        nxai_pipe_t read_handle = nxai_pipe_get_read_pipe( pipes_array[pipe_index], direction );
+
+        // Prepare buffer for read operation
+        char read_buffer[1];
+        DWORD bytesRead = 0;
+
+        if ( !ReadFile( read_handle, read_buffer, 1, &bytesRead, &overlaps[pipe_index] ) ) {
+            DWORD lastError = GetLastError();
+            if ( lastError != ERROR_IO_PENDING ) {
+                // Cleanup events
+                for ( size_t j = 0; j < pipes_length; j++ ) {
+                    CloseHandle( overlaps[j].hEvent );
+                }
+                free( overlaps );
+
+                if ( lastError != ERROR_BROKEN_PIPE && lastError != ERROR_PIPE_NOT_CONNECTED ) {
+                    raise( SIGABRT );
+                }
+                return pipes_length;
+            }
+        }
     }
 
-    // Wait for data on any pipe
-    DWORD wait_result = WaitForMultipleObjects( pipes_length, handles_array, FALSE, INFINITE );
-    if ( wait_result == WAIT_FAILED ) {
-        return pipes_length;
+    // Wait for any operation to complete
+    DWORD result = WaitForMultipleObjects( pipes_length,
+                                           (HANDLE *) overlaps,
+                                           FALSE,
+                                           timeout_ms );
+
+    size_t completed_index = pipes_length;
+
+    if ( result == WAIT_TIMEOUT ) {
+        // Timeout occurred
+        nxai_vlog_verbose( "Timed out waiting for client output\n" );
+    } else if ( result >= WAIT_OBJECT_0 && result < WAIT_OBJECT_0 + pipes_length ) {
+        // One of the operations completed
+        completed_index = result - WAIT_OBJECT_0;
+
+        // Get the result of the completed operation
+        DWORD bytesRead = 0;
+        if ( GetOverlappedResult( nxai_pipe_get_read_pipe( pipes_array[completed_index], direction ),
+                                  &overlaps[completed_index],
+                                  &bytesRead,
+                                  FALSE ) ) {
+            if ( bytesRead > 0 ) {
+                char read_buffer[1];
+                // Reset the file pointer to the start of the read operation
+                LARGE_INTEGER zero = { 0 };
+                SetFilePointerEx( nxai_pipe_get_read_pipe( pipes_array[completed_index], direction ),
+                                  zero,
+                                  NULL,
+                                  FILE_CURRENT );
+
+                // Read the actual data
+                DWORD bytesActuallyRead = 0;
+                ReadFile( nxai_pipe_get_read_pipe( pipes_array[completed_index], direction ),
+                          read_buffer,
+                          1,
+                          &bytesActuallyRead,
+                          NULL );
+
+                if ( bytesActuallyRead > 0 ) {
+                    *return_byte = read_buffer[0];
+                }
+            }
+        }
     }
 
-    // Convert wait result to pipe index
-    size_t pipe_index = wait_result - WAIT_OBJECT_0;
-    if ( pipe_index >= pipes_length ) {
-        return pipes_length;
+    // Cleanup
+    for ( size_t i = 0; i < pipes_length; i++ ) {
+        CloseHandle( overlaps[i].hEvent );
     }
+    free( overlaps );
 
-    // Read single byte
-    DWORD bytes_read;
-    if ( !ReadFile( nxai_pipe_get_read_pipe( pipes_array[pipe_index], direction ),
-                    return_byte, 1, &bytes_read, NULL ) ) {
-        return pipes_length;
-    }
-
-    return pipe_index;
+    return completed_index;
 
 #else
     // Linux implementation
