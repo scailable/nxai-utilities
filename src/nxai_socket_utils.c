@@ -38,7 +38,7 @@ const uint8_t MESSAGE_HEADER_LENGTH = 4;
 bool nxai_socket_interrupt_signal = false;
 
 // Create timeout structure for socket connections
-static struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
+static struct timeval default_socket_timeout = { .tv_sec = 1, .tv_usec = 0 };
 
 // Helper function to convert Windows errors to errno values
 #if defined( _MSC_VER )
@@ -147,7 +147,7 @@ uint32_t nxai_socket_send_receive_message( const char *socket_path, const char *
 #endif
 }
 
-int nxai_socket_create_listener( const char *socket_path ) {
+nxai_socket_t nxai_socket_create_listener( const char *socket_path ) {
 #if defined( _MSC_VER )
     // Windows implementation
 
@@ -162,7 +162,7 @@ int nxai_socket_create_listener( const char *socket_path ) {
     WideCharToMultiByte( CP_UTF8, 0, wpath, -1, unix_path, MAX_PATH, NULL, NULL );
 
     // Create socket to listen on
-    socket_fd = WSASocketA( AF_UNIX, SOCK_STREAM, 0, NULL, 0, 0 );
+    socket_fd = WSASocketA( AF_UNIX, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED );
     if ( socket_fd == INVALID_SOCKET ) {
         char error_string[1024];
         get_windows_error( WSAGetLastError(), error_string, 1024 );
@@ -190,6 +190,24 @@ int nxai_socket_create_listener( const char *socket_path ) {
     sa.nLength = sizeof( SECURITY_ATTRIBUTES );
     sa.bInheritHandle = TRUE;
     sa.lpSecurityDescriptor = NULL;
+
+    // Set receive timeout
+    if ( setsockopt( socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &default_socket_timeout, sizeof( default_socket_timeout ) ) == SOCKET_ERROR ) {
+        char error_string[1024];
+        get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Failed to set receive timeout: %s\n", error_string );
+        closesocket( socket_fd );
+        return -1;
+    }
+
+    // Set send timeout
+    if ( setsockopt( socket_fd, SOL_SOCKET, SO_SNDTIMEO, (const char *) &default_socket_timeout, sizeof( default_socket_timeout ) ) == SOCKET_ERROR ) {
+        char error_string[1024];
+        get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Failed to set send timeout: %s\n", error_string );
+        closesocket( socket_fd );
+        return -1;
+    }
 
     // Start listening on socket
     if ( listen( socket_fd, SOMAXCONN ) == SOCKET_ERROR ) {
@@ -244,13 +262,13 @@ int nxai_socket_create_listener( const char *socket_path ) {
     nxai_chmod( socket_path, S_IRGRP | S_IRUSR | S_IROTH | S_IWGRP | S_IWOTH | S_IWUSR );
 
     // Set timeout for socket
-    setsockopt( socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv, sizeof tv );
+    setsockopt( socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &default_socket_timeout, sizeof default_socket_timeout );
 
     return socket_fd;
 #endif
 }
 
-void nxai_socket_receive_on_connection( int connection_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length ) {
+void nxai_socket_receive_on_connection( nxai_socket_t connection_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length ) {
 #if defined( _MSC_VER )
     // Windows implementation
     int flags = 0;
@@ -258,8 +276,7 @@ void nxai_socket_receive_on_connection( int connection_fd, size_t *allocated_buf
     int num_read;
 
     // Set timeout for socket receive
-    struct timeval tv = { /* Initialize timeouts */ };
-    setsockopt( connection_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv, sizeof( tv ) );
+    setsockopt( connection_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &default_socket_timeout, sizeof( default_socket_timeout ) );
 
     // Read message header
     num_read = recv( connection_fd, (char *) message_length, sizeof( *message_length ), flags );
@@ -296,7 +313,7 @@ void nxai_socket_receive_on_connection( int connection_fd, size_t *allocated_buf
     const int flags = MSG_NOSIGNAL;
 
     // Set timeout for socket receive
-    setsockopt( connection_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv, sizeof tv );
+    setsockopt( connection_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &default_socket_timeout, sizeof default_socket_timeout );
     // Read message header, which tells us the full message length
     num_read = recv( connection_fd, message_length, MESSAGE_HEADER_LENGTH, flags );
     if ( (size_t) num_read != MESSAGE_HEADER_LENGTH ) {
@@ -332,19 +349,72 @@ void nxai_socket_receive_on_connection( int connection_fd, size_t *allocated_buf
 #endif
 }
 
-int nxai_socket_await_message( int socket_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length ) {
+nxai_socket_t nxai_socket_await_message( nxai_socket_t socket_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length ) {
 #if defined( _MSC_VER )
     // Windows implementation
     SOCKET connection_fd = INVALID_SOCKET;
 
-    // Wait for incoming connection
-    connection_fd = accept( socket_fd, NULL, NULL );
-    if ( connection_fd == INVALID_SOCKET ) {
-        errno = win32_error_to_errno( WSAGetLastError() );
+    // Create event for accepting connections
+    WSAEVENT accept_event = WSACreateEvent();
+    if ( accept_event == WSA_INVALID_EVENT ) {
+        char error_string[1024];
+        get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Failed to create accept event: %s\n", error_string );
         return -1;
     }
 
+    // Associate event with network events
+    if ( WSAEventSelect( socket_fd, accept_event, FD_ACCEPT | FD_CONNECT ) == SOCKET_ERROR ) {
+        char error_string[1024];
+        get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Failed to select accept event: %s\n", error_string );
+        WSACloseEvent( accept_event );
+        return INVALID_SOCKET;
+    }
+
+    // Wait for connection or timeout
+    DWORD wait_result = WSAWaitForMultipleEvents( 1, &accept_event, FALSE, default_socket_timeout.tv_sec * 1000, FALSE );
+    if ( wait_result == WSA_WAIT_FAILED ) {
+        char error_string[1024];
+        get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Accept wait failed: %s\n", error_string );
+        WSACloseEvent( accept_event );
+        return INVALID_SOCKET;
+    }
+
+    if ( wait_result == WSA_WAIT_TIMEOUT ) {
+        WSAResetEvent( accept_event );
+        WSACloseEvent( accept_event );
+        errno = ETIMEDOUT;
+        return INVALID_SOCKET;
+    }
+
+    // Check if there's actually a connection pending
+    fd_set read_fds;
+    struct timeval zero_time = { 0 };
+    FD_ZERO( &read_fds );
+    FD_SET( socket_fd, &read_fds );
+
+    int select_result = select( 0, &read_fds, NULL, NULL, &zero_time );
+    if ( select_result <= 0 ) {
+        WSACloseEvent( accept_event );
+        return INVALID_SOCKET;
+    }
+
+    // Accept the connection
+    SOCKET client_socket = accept( socket_fd, NULL, NULL );
+    if ( client_socket == INVALID_SOCKET ) {
+        char error_string[1024];
+        get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Accept failed: %s\n", error_string );
+        WSACloseEvent( accept_event );
+        return INVALID_SOCKET;
+    }
+
+    WSACloseEvent( accept_event );
+
     // Receive message on connection
+    nxai_vlog( "Receiving on connection...\n" );
     nxai_socket_receive_on_connection( connection_fd, allocated_buffer_size,
                                        message_input_buffer, message_length );
 
@@ -463,7 +533,7 @@ void nxai_delete_socket_file( const char *socket_path ) {
 #endif
 }
 
-int32_t nxai_socket_connect( const char *socket_path ) {
+nxai_socket_t nxai_socket_connect( const char *socket_path ) {
 #if defined( _MSC_VER )
     // Windows implementation
     SOCKET socket_fd = INVALID_SOCKET;
@@ -476,9 +546,8 @@ int32_t nxai_socket_connect( const char *socket_path ) {
     }
 
     // Set timeouts
-    struct timeval tv = { /* Initialize timeouts */ };
-    setsockopt( socket_fd, SOL_SOCKET, SO_SNDTIMEO, (const char *) &tv, sizeof( tv ) );
-    setsockopt( socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv, sizeof( tv ) );
+    setsockopt( socket_fd, SOL_SOCKET, SO_SNDTIMEO, (const char *) &default_socket_timeout, sizeof( default_socket_timeout ) );
+    setsockopt( socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &default_socket_timeout, sizeof( default_socket_timeout ) );
 
     // Generate socket address
     struct sockaddr_un addr;
@@ -505,8 +574,8 @@ int32_t nxai_socket_connect( const char *socket_path ) {
         close( socket_fd );
         return -1;
     }
-    setsockopt( socket_fd, SOL_SOCKET, SO_SNDTIMEO, (const char *) &tv, sizeof tv );
-    setsockopt( socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv, sizeof tv );
+    setsockopt( socket_fd, SOL_SOCKET, SO_SNDTIMEO, (const char *) &default_socket_timeout, sizeof default_socket_timeout );
+    setsockopt( socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &default_socket_timeout, sizeof default_socket_timeout );
 
     // Generate socket address
     struct sockaddr_un addr;
@@ -537,7 +606,7 @@ int32_t nxai_socket_connect( const char *socket_path ) {
 
 void nxai_socket_send( const char *socket_path, const char *message_to_send, uint32_t message_length ) {
 
-    int32_t connection_fd = nxai_socket_connect( socket_path );
+    nxai_socket_t connection_fd = nxai_socket_connect( socket_path );
 
     // Send message to newly created socket
     nxai_socket_send_to_connection( connection_fd, message_to_send, message_length );
@@ -560,8 +629,7 @@ bool nxai_socket_send_to_connection( const int connection_fd, const char *messag
 #if defined( _MSC_VER )
     // Windows implementation
     // Set timeout for sending
-    struct timeval tv = { /* Initialize timeouts */ };
-    setsockopt( connection_fd, SOL_SOCKET, SO_SNDTIMEO, (const char *) &tv, sizeof( tv ) );
+    setsockopt( connection_fd, SOL_SOCKET, SO_SNDTIMEO, (const char *) &default_socket_timeout, sizeof( default_socket_timeout ) );
 
     size_t header_sent_total = 0;
 
@@ -596,7 +664,7 @@ bool nxai_socket_send_to_connection( const int connection_fd, const char *messag
     return true;
 #else
     // Linux implementation
-    setsockopt( connection_fd, SOL_SOCKET, SO_SNDTIMEO, (const char *) &tv, sizeof tv );
+    setsockopt( connection_fd, SOL_SOCKET, SO_SNDTIMEO, (const char *) &default_socket_timeout, sizeof default_socket_timeout );
 
     const int32_t flags = MSG_NOSIGNAL;
 

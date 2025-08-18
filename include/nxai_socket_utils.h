@@ -8,6 +8,17 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
+#if defined( _MSC_VER )
+// Windows specific definitions
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock2.h>
+typedef SOCKET nxai_socket_t;
+#else
+// Linux specific definitions
+typedef int nxai_socket_t;
+#endif
+
 /**
  * @brief A boolean that can be used to interrupt the socket listener.
  * By default creating a socket listener will listen for new connections in a loop.
@@ -35,7 +46,7 @@ extern bool nxai_socket_interrupt_signal;
  * - An error occurred while binding the socket to the specified path.
  * - An error occurred while starting to listen on the socket.
  */
-int nxai_socket_create_listener( const char *socket_path );
+nxai_socket_t nxai_socket_create_listener( const char *socket_path );
 
 /**
  * @brief Receives a socket message on a given connection.
@@ -50,7 +61,7 @@ int nxai_socket_create_listener( const char *socket_path );
  * @param message_input_buffer A pointer to the input buffer in which to store the received message.
  * @param message_length A pointer to a variable in which to store the length of the received message.
  */
-void nxai_socket_receive_on_connection( int connection_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length );
+void nxai_socket_receive_on_connection( nxai_socket_t connection_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length );
 
 /**
  * \brief Waits for an incoming socket message, reads it and saves it to the provided buffer.
@@ -73,7 +84,7 @@ void nxai_socket_receive_on_connection( int connection_fd, size_t *allocated_buf
  * \retval connection_fd An error occurred while the message header length does not equal MESSAGE_HEADER_LENGTH 
  *                       or while reallocating the buffer.
  */
-int nxai_socket_await_message( int socket_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length );
+nxai_socket_t nxai_socket_await_message( nxai_socket_t socket_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length );
 
 /**
  * @brief Creates a socket and sets it to listen for incoming connections.
@@ -103,7 +114,7 @@ void nxai_delete_socket_file( const char *socket_path );
  * 
  * @return socket_fd on successful connection, -1 on any failure.
  */
-int32_t nxai_socket_connect( const char *socket_path );
+nxai_socket_t nxai_socket_connect( const char *socket_path );
 
 /**
  * @brief Send a string to a socket
