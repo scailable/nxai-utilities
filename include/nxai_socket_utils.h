@@ -124,7 +124,7 @@ nxai_socket_t nxai_socket_connect( const char *socket_path );
  */
 void nxai_socket_send( const char *socket_path, const char *string_to_send, uint32_t message_length );
 
-int nxai_close_socket( int connection_fd );
+int nxai_close_socket( nxai_socket_t connection_fd );
 
 /**
  * @brief Sends a message through a socket and receives a response.
@@ -156,7 +156,7 @@ int nxai_socket_initialize_sockets();
  *
  * @return true if the message was successfully sent, false otherwise
  */
-bool nxai_socket_send_to_connection( const int connection_fd, const char *message_to_send, uint32_t message_length );
+bool nxai_socket_send_to_connection( const nxai_socket_t connection_fd, const char *message_to_send, uint32_t message_length );
 
 #ifdef __cplusplus
 }

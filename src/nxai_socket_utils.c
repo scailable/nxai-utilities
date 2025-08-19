@@ -148,6 +148,10 @@ uint32_t nxai_socket_send_receive_message( const char *socket_path, const char *
 }
 
 nxai_socket_t nxai_socket_create_listener( const char *socket_path ) {
+
+    // Ensure socket file is deleted
+    nxai_delete_socket_file( socket_path );
+
 #if defined( _MSC_VER )
     // Windows implementation
 
@@ -614,7 +618,7 @@ void nxai_socket_send( const char *socket_path, const char *message_to_send, uin
     nxai_close_socket( connection_fd );
 }
 
-int nxai_close_socket( int connection_fd ) {
+int nxai_close_socket( nxai_socket_t connection_fd ) {
 // Close socket
 #if defined( _MSC_VER )
     // Windows implementation
@@ -625,7 +629,7 @@ int nxai_close_socket( int connection_fd ) {
 #endif
 }
 
-bool nxai_socket_send_to_connection( const int connection_fd, const char *message_to_send, uint32_t message_length ) {
+bool nxai_socket_send_to_connection( const nxai_socket_t connection_fd, const char *message_to_send, uint32_t message_length ) {
 #if defined( _MSC_VER )
     // Windows implementation
     // Set timeout for sending
