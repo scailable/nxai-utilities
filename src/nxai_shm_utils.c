@@ -22,8 +22,10 @@
 
 #if defined( _MSC_VER )
 // Windows stuff
-#include "winsock2.h"
+#define WIN32_LEAN_AND_MEAN
 #include "windows.h"
+#include "winsock2.h"
+#include <errno.h>
 #include <basetsd.h>
 typedef SSIZE_T ssize_t;
 static volatile long PipeSerialNumber;
@@ -403,6 +405,11 @@ size_t nxai_pipe_poll( bidirectional_pipe_t *pipes_array, size_t pipes_length, P
                     *return_byte = read_buffer[0];
                 }
             }
+        } else {
+            char error_string[1024];
+            get_windows_error( WSAGetLastError(), error_string, 1024 );
+            nxai_vlog( "Warning: Could not get overlapped result: %s\n", error_string );
+            return pipes_length;
         }
     }
 
