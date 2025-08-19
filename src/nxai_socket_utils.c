@@ -356,8 +356,6 @@ void nxai_socket_receive_on_connection( nxai_socket_t connection_fd, size_t *all
 nxai_socket_t nxai_socket_await_message( nxai_socket_t socket_fd, size_t *allocated_buffer_size, char **message_input_buffer, uint32_t *message_length ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    SOCKET connection_fd = INVALID_SOCKET;
-
     // Create event for accepting connections
     WSAEVENT accept_event = WSACreateEvent();
     if ( accept_event == WSA_INVALID_EVENT ) {
@@ -419,10 +417,10 @@ nxai_socket_t nxai_socket_await_message( nxai_socket_t socket_fd, size_t *alloca
 
     // Receive message on connection
     nxai_vlog( "Receiving on connection...\n" );
-    nxai_socket_receive_on_connection( connection_fd, allocated_buffer_size,
+    nxai_socket_receive_on_connection( client_socket, allocated_buffer_size,
                                        message_input_buffer, message_length );
 
-    return connection_fd;
+    return client_socket;
 #else
     // Linux implementation
 

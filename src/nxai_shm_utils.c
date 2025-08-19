@@ -383,7 +383,7 @@ size_t nxai_pipe_poll( bidirectional_pipe_t *pipes_array, size_t pipes_length, P
         if ( GetOverlappedResult( nxai_pipe_get_read_pipe( pipes_array[completed_index], direction ),
                                   &overlaps[completed_index],
                                   &bytesRead,
-                                  FALSE ) ) {
+                                  TRUE ) ) {
             if ( bytesRead > 0 ) {
                 char read_buffer[1];
                 // Reset the file pointer to the start of the read operation
@@ -525,24 +525,63 @@ ssize_t nxai_pipe_send( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction, 
 #endif
 }
 
-char nxai_pipe_timed_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction, int timeout ) {
+char nxai_pipe_timed_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction, int timeout_s ) {
 #if defined( _MSC_VER )
     // Windows implementation
     char buffer;
     DWORD bytes_read;
-    DWORD start_time = GetTickCount();
+    OVERLAPPED overlapped = { 0 };
+    HANDLE pipe_handle = nxai_pipe_get_read_pipe( pipe_fd, direction );
 
-    while ( GetTickCount() - start_time < timeout * 1000 ) {
-        if ( !ReadFile( nxai_pipe_get_read_pipe( pipe_fd, direction ), &buffer, 1, &bytes_read, NULL ) ) {
+    // Initialize overlapped structure
+    overlapped.hEvent = CreateEvent( NULL, TRUE, FALSE, NULL );
+    if ( !overlapped.hEvent ) {
+        nxai_vlog( "Could not create event!\n" );
+        return -1;
+    }
+
+    // Start overlapped read operation
+    if ( !ReadFile( pipe_handle, &buffer, 1, &bytes_read, &overlapped ) ) {
+        DWORD last_error = GetLastError();
+        if ( last_error != ERROR_IO_PENDING ) {
+            CloseHandle( overlapped.hEvent );
+            nxai_vlog( "Could not read from pipe!\n" );
             return -1;
         }
-        if ( bytes_read > 0 ) {
-            return buffer;
-        }
-
-        Sleep( 100 );// Prevent busy waiting
     }
-    return -3;
+
+    // Wait for completion with timeout_s
+    DWORD wait_result = WaitForSingleObject( overlapped.hEvent, timeout_s * 1000 );// Convert to ms
+
+    switch ( wait_result ) {
+        case WAIT_OBJECT_0:
+            // Operation completed successfully
+            if ( !GetOverlappedResult( pipe_handle, &overlapped, &bytes_read, FALSE ) ) {
+                CloseHandle( overlapped.hEvent );
+                nxai_vlog( "GetOverlappedResult failed!\n" );
+                return -1;
+            }
+            if ( bytes_read > 0 ) {
+                CloseHandle( overlapped.hEvent );
+                return buffer;
+            }
+            break;
+
+        case WAIT_TIMEOUT:
+            // Cancel pending operation
+            CancelIo( pipe_handle );
+            CloseHandle( overlapped.hEvent );
+            return -3;// Timeout
+
+        default:
+            // Other wait errors
+            CloseHandle( overlapped.hEvent );
+            nxai_vlog( "WaitForSingleObject failed!\n" );
+            return -1;
+    }
+
+    CloseHandle( overlapped.hEvent );
+    return -3;// No data available
 #else
     // Linux implementation
     char buffer;
@@ -553,10 +592,10 @@ char nxai_pipe_timed_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION directio
     // Set up select parameters
     FD_ZERO( &read_fds );
     FD_SET( nxai_pipe_get_read_pipe( pipe_fd, direction ), &read_fds );
-    tv.tv_sec = timeout;
+    tv.tv_sec = timeout_s;
     tv.tv_usec = 0;
 
-    // Wait for data or timeout
+    // Wait for data or timeout_s
     if ( select( nxai_pipe_get_read_pipe( pipe_fd, direction ) + 1, &read_fds, NULL, NULL, &tv ) <= 0 ) {
         return -3;
     }

@@ -520,7 +520,7 @@ static char *convert_input_arguments( char *const argv[] ) {
     int index = 0;
     size_t string_length = 0;
     while ( argv[index] != NULL ) {
-        string_length += strlen( argv[index] ) + 1;
+        string_length += strlen( argv[index] ) + 3;// Make space for trailing space and quotation marks
         index++;
         if ( index == 1024 ) {
             nxai_vlog( "Too many input arguments! Array needs to be terminated with a NULL pointer.\n" );
@@ -537,9 +537,14 @@ static char *convert_input_arguments( char *const argv[] ) {
     index = 0;
     size_t current_index = 0;
     while ( argv[index] != NULL ) {
+        // Add preceding quote
+        argument_string[current_index++] = '"';
         size_t arg_length = strlen( argv[index] );
         memcpy( &( argument_string[current_index] ), argv[index], arg_length );
         current_index += arg_length;
+        // Add trailing quote
+        argument_string[current_index++] = '"';
+        // Add space
         argument_string[current_index++] = ' ';
         index++;
     }
