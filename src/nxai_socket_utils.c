@@ -561,7 +561,9 @@ nxai_socket_t nxai_socket_connect( const char *socket_path ) {
 
     // Connect to socket
     if ( connect( socket_fd, (struct sockaddr *) &addr, sizeof( struct sockaddr_un ) ) == SOCKET_ERROR ) {
-        nxai_vlog( "Warning: connect to socket [%s] failed: %d\n", socket_path, WSAGetLastError() );
+        char error_string[1024];
+        DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Warning: Connect to socket [%s] failed: %.*s\n", socket_path, error_length, error_string );
         closesocket( socket_fd );
         return -1;
     }

@@ -709,8 +709,16 @@ nxai_shm_t nxai_shm_create( const char *path, int project_id, size_t size ) {
 bool nxai_shm_get_id( nxai_shm_t *shm ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    shm->id = OpenFileMappingW( FILE_MAP_ALL_ACCESS, FALSE, shm->key );
-    return true;
+    HANDLE shm_id = OpenFileMappingA( FILE_MAP_ALL_ACCESS, FALSE, shm->key );
+    if ( shm_id == NULL ) {
+        char error_string[1024];
+        DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Warning: Could not get SHM ID: %.*s\n", error_length, error_string );
+        return false;
+    } else {
+        shm->id = shm_id;
+        return true;
+    }
 #else
     // Linux implementation
     shm->id = shmget( shm->key, 0, 0 );
