@@ -47,7 +47,7 @@ typedef enum {
 
 char *nxai_shm_key_to_string( nxai_shm_t shm );
 
-void nxai_shm_string_to_key( nxai_shm_t *result, const char *str );
+void nxai_shm_key_from_string( nxai_shm_t *result, const char *str );
 
 char *nxai_shm_id_to_string( nxai_shm_t shm );
 
@@ -80,6 +80,8 @@ ssize_t nxai_pipe_send( bidirectional_pipe_t pipe, PIPE_DIRECTION direction, cha
 nxai_shm_t nxai_shm_create_random( size_t size );
 
 bool nxai_shm_get_id( nxai_shm_t *shm );
+
+bool nxai_shm_valid( void *shm_buffer );
 
 void *nxai_shm_attach( nxai_shm_t shm );
 

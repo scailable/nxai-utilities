@@ -78,7 +78,7 @@ typedef void nxai_handler_return_t;
 #define nxai_path_join( ... ) _nxai_path_join( PP_NARG( __VA_ARGS__ ), __VA_ARGS__ )
 
 #ifdef _MSC_VER
-void get_windows_error( DWORD errorCode, char *buffer, DWORD bufferSize );
+DWORD get_windows_error( DWORD errorCode, char *buffer, DWORD bufferSize );
 #endif
 
 int nxai_strcasecmp( const char *str1, const char *str2 );

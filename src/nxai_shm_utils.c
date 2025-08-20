@@ -57,7 +57,7 @@ char *nxai_shm_key_to_string( nxai_shm_t shm ) {
     return shm_string;
 }
 
-void nxai_shm_string_to_key( nxai_shm_t *result, const char *str ) {
+void nxai_shm_key_from_string( nxai_shm_t *result, const char *str ) {
 #if defined( _MSC_VER )
     // Windows implementation
     // Convert string to integer using atoi
@@ -407,8 +407,8 @@ size_t nxai_pipe_poll( bidirectional_pipe_t *pipes_array, size_t pipes_length, P
             }
         } else {
             char error_string[1024];
-            get_windows_error( WSAGetLastError(), error_string, 1024 );
-            nxai_vlog( "Warning: Could not get overlapped result: %s\n", error_string );
+            DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+            nxai_vlog( "Warning: Could not get overlapped result: %.*s\n", error_length, error_string );
             return pipes_length;
         }
     }
@@ -722,16 +722,33 @@ bool nxai_shm_get_id( nxai_shm_t *shm ) {
 #endif
 }
 
+bool nxai_shm_valid( void *shm_buffer ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    return shm_buffer != NULL;// In Windows the pointer will be NULL if mapping failed
+#else
+    // Linux implementation
+    return shm_pointer != (void *) -1;// In Linux the pointer will be -1 if mapping failed
+#endif
+}
+
 void *nxai_shm_attach( nxai_shm_t shm ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    return MapViewOfFile(
-            shm.key,            // Handle to map object
+    LPVOID shm_pointer = MapViewOfFile(
+            shm.id,             // Handle to map object
             FILE_MAP_ALL_ACCESS,// Desired access
             0,                  // File offset (high DWORD)
             0,                  // File offset (low DWORD)
             0                   // Number of bytes to map
     );
+    if ( shm_pointer == NULL ) {
+        char error_string[1024];
+        DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Warning: Could not attach shared memory: %.*s\n", error_length, error_string );
+    }
+
+    return shm_pointer;
 #else
     // Linux implementation
     // Attach the shared memory segment to the process's address space.

@@ -169,8 +169,8 @@ nxai_socket_t nxai_socket_create_listener( const char *socket_path ) {
     socket_fd = WSASocketA( AF_UNIX, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED );
     if ( socket_fd == INVALID_SOCKET ) {
         char error_string[1024];
-        get_windows_error( WSAGetLastError(), error_string, 1024 );
-        nxai_vlog( "Error: Sender socket error: %s\n", error_string );
+        DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Sender socket error: %.*s\n", error_length, error_string );
         return -1;
     }
 
@@ -183,8 +183,8 @@ nxai_socket_t nxai_socket_create_listener( const char *socket_path ) {
     // Bind to socket
     if ( bind( socket_fd, (struct sockaddr *) &addr, sizeof( struct sockaddr_un ) ) == SOCKET_ERROR ) {
         char error_string[1024];
-        get_windows_error( WSAGetLastError(), error_string, 1024 );
-        nxai_vlog( "Error: Sender socket bind error: %s\n", error_string );
+        DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Sender socket bind error: %.*s\n", error_length, error_string );
         closesocket( socket_fd );
         return -1;
     }
@@ -198,8 +198,8 @@ nxai_socket_t nxai_socket_create_listener( const char *socket_path ) {
     // Set receive timeout
     if ( setsockopt( socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &default_socket_timeout, sizeof( default_socket_timeout ) ) == SOCKET_ERROR ) {
         char error_string[1024];
-        get_windows_error( WSAGetLastError(), error_string, 1024 );
-        nxai_vlog( "Error: Failed to set receive timeout: %s\n", error_string );
+        DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Failed to set receive timeout: %.*s\n", error_length, error_string );
         closesocket( socket_fd );
         return -1;
     }
@@ -207,8 +207,8 @@ nxai_socket_t nxai_socket_create_listener( const char *socket_path ) {
     // Set send timeout
     if ( setsockopt( socket_fd, SOL_SOCKET, SO_SNDTIMEO, (const char *) &default_socket_timeout, sizeof( default_socket_timeout ) ) == SOCKET_ERROR ) {
         char error_string[1024];
-        get_windows_error( WSAGetLastError(), error_string, 1024 );
-        nxai_vlog( "Error: Failed to set send timeout: %s\n", error_string );
+        DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Failed to set send timeout: %.*s\n", error_length, error_string );
         closesocket( socket_fd );
         return -1;
     }
@@ -360,16 +360,16 @@ nxai_socket_t nxai_socket_await_message( nxai_socket_t socket_fd, size_t *alloca
     WSAEVENT accept_event = WSACreateEvent();
     if ( accept_event == WSA_INVALID_EVENT ) {
         char error_string[1024];
-        get_windows_error( WSAGetLastError(), error_string, 1024 );
-        nxai_vlog( "Error: Failed to create accept event: %s\n", error_string );
+        DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Failed to create accept event: %.*s\n", error_length, error_string );
         return -1;
     }
 
     // Associate event with network events
     if ( WSAEventSelect( socket_fd, accept_event, FD_ACCEPT | FD_CONNECT ) == SOCKET_ERROR ) {
         char error_string[1024];
-        get_windows_error( WSAGetLastError(), error_string, 1024 );
-        nxai_vlog( "Error: Failed to select accept event: %s\n", error_string );
+        DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Failed to select accept event: %.*s\n", error_length, error_string );
         WSACloseEvent( accept_event );
         return INVALID_SOCKET;
     }
@@ -378,8 +378,8 @@ nxai_socket_t nxai_socket_await_message( nxai_socket_t socket_fd, size_t *alloca
     DWORD wait_result = WSAWaitForMultipleEvents( 1, &accept_event, FALSE, default_socket_timeout.tv_sec * 1000, FALSE );
     if ( wait_result == WSA_WAIT_FAILED ) {
         char error_string[1024];
-        get_windows_error( WSAGetLastError(), error_string, 1024 );
-        nxai_vlog( "Error: Accept wait failed: %s\n", error_string );
+        DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Accept wait failed: %.*s\n", error_length, error_string );
         WSACloseEvent( accept_event );
         return INVALID_SOCKET;
     }
@@ -407,8 +407,8 @@ nxai_socket_t nxai_socket_await_message( nxai_socket_t socket_fd, size_t *alloca
     SOCKET client_socket = accept( socket_fd, NULL, NULL );
     if ( client_socket == INVALID_SOCKET ) {
         char error_string[1024];
-        get_windows_error( WSAGetLastError(), error_string, 1024 );
-        nxai_vlog( "Error: Accept failed: %s\n", error_string );
+        DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Accept failed: %.*s\n", error_length, error_string );
         WSACloseEvent( accept_event );
         return INVALID_SOCKET;
     }

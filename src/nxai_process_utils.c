@@ -58,8 +58,8 @@ nxai_mutex_t rotating_logfile_lock;
 static void nxai_vvlog( const char *fmt, va_list *args );
 
 #if defined( _MSC_VER )
-void get_windows_error( DWORD errorCode, char *buffer, DWORD bufferSize ) {
-    FormatMessageA(
+DWORD get_windows_error( DWORD errorCode, char *buffer, DWORD bufferSize ) {
+    return FormatMessageA(
             FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
             NULL,
             errorCode,
