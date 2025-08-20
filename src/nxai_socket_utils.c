@@ -279,12 +279,31 @@ void nxai_socket_receive_on_connection( nxai_socket_t connection_fd, size_t *all
     size_t num_read_cumulative = 0;
     int num_read;
 
-    // Set timeout for socket receive
-    setsockopt( connection_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &default_socket_timeout, sizeof( default_socket_timeout ) );
+    WSAPOLLFD poll_fd;
+    poll_fd.fd = connection_fd;
+    poll_fd.events = POLLRDNORM;
+
+    int result = WSAPoll( &poll_fd, 1, default_socket_timeout.tv_sec * 1000 );
+
+    if ( result == SOCKET_ERROR ) {
+        DWORD last_error = WSAGetLastError();
+        char error_string[1024];
+        get_windows_error( last_error, error_string, sizeof( error_string ) );
+        nxai_vlog( "Warning: Poll failed: %.*s\n", strlen( error_string ), error_string );
+        return;
+    } else if ( result == 0 ) {
+        // Timeout occurred
+        return;
+    }
 
     // Read message header
     num_read = recv( connection_fd, (char *) message_length, sizeof( *message_length ), flags );
     if ( num_read != sizeof( *message_length ) ) {
+        if ( num_read == SOCKET_ERROR ) {
+            char error_string[1024];
+            DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+            nxai_vlog( "Warning: Could not receive size of incoming message: %.*s\n", error_length, error_string );
+        }
         return;
     }
 

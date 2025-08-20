@@ -49,30 +49,31 @@ char *nxai_shm_key_to_string( nxai_shm_t shm ) {
 #if defined( _MSC_VER )
     // Windows implementation
     // Copy string so it can be freed
-    char *shm_string = malloc( strlen( shm.key ) );
+    char *shm_key_string = malloc( strlen( shm.key ) );
+    strcpy( shm_key_string, shm.key );
 #else
     // Linux implementation
-    char *shm_string = nxai_sprintf( 32, "%d", shm.key );
+    char *shm_key_string = nxai_sprintf( 32, "%d", shm.key );
 #endif
-    return shm_string;
+    return shm_key_string;
 }
 
-void nxai_shm_key_from_string( nxai_shm_t *result, const char *str ) {
+void nxai_shm_key_from_string( nxai_shm_t *shm, const char *str ) {
 #if defined( _MSC_VER )
     // Windows implementation
     // Convert string to integer using atoi
-    strcpy( result->key, str );
+    strcpy( shm->key, str );
 #else
     // Linux implementation
     // Convert string to integer using strtol for better error handling
     char *endptr;
     errno = 0;
-    result->key = strtol( str, &endptr, 10 );
+    shm->key = strtol( str, &endptr, 10 );
 
     // Check for errors
     if ( errno == ERANGE || *endptr != '\0' ) {
         // Handle conversion error
-        result->key = 0;
+        shm->key = 0;
     }
 #endif
 }
@@ -80,9 +81,7 @@ void nxai_shm_key_from_string( nxai_shm_t *result, const char *str ) {
 char *nxai_shm_id_to_string( nxai_shm_t shm ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    // Copy string so it can be freed
-    char *id_string = malloc( 20 );
-    sprintf( id_string, L"%p", shm.id );
+    char *id_string = nxai_pointer_to_string( shm.id );
 #else
     // Linux implementation
     char *id_string = nxai_sprintf( 32, "%d", shm.id );
@@ -642,21 +641,44 @@ void nxai_pipe_close( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
 nxai_shm_t nxai_shm_create_random( size_t size ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    // Generate random name for anonymous mapping
     nxai_shm_t new_shm;
-    sprintf_s( new_shm.key, MAX_PATH, "\\\\\\.\\Global\\RandomSHM_%08X", rand() );
+    new_shm.id = NULL;
 
-    // Create file mapping object
-    HANDLE hMapFile = CreateFileMappingA(
-            INVALID_HANDLE_VALUE,// Use paging file
-            NULL,                // Default security attributes
-            PAGE_READWRITE,      // Read/write access
-            0,                   // High DWORD of size
-            size + HEADER_BYTES, // Low DWORD of size
-            new_shm.key          // Name of mapping object
-    );
+    SECURITY_ATTRIBUTES saAttr;
+    saAttr.nLength = sizeof( SECURITY_ATTRIBUTES );
+    saAttr.bInheritHandle = TRUE;
+    saAttr.lpSecurityDescriptor = NULL;
 
-    new_shm.id = hMapFile;
+    size_t retry_counter = 0;
+    while ( retry_counter < 5 ) {
+        // Generate random name for anonymous mapping
+        sprintf_s( new_shm.key, MAX_PATH, "Global_RandomSHM_%08X", rand() );
+
+        // Create file mapping object
+        HANDLE hMapFile = CreateFileMappingA(
+                INVALID_HANDLE_VALUE,// Use paging file
+                &saAttr,             // Default security attributes
+                PAGE_READWRITE,      // Read/write access
+                0,                   // High DWORD of size
+                size + HEADER_BYTES, // Low DWORD of size
+                new_shm.key          // Name of mapping object
+        );
+
+        if ( hMapFile == NULL ) {
+            char error_string[1024];
+            get_windows_error( WSAGetLastError(), error_string, 1024 );
+            nxai_vlog( "Warning: Could not create SHM: %s\n", error_string );
+            break;
+        } else if ( WSAGetLastError() == ERROR_ALREADY_EXISTS ) {
+            // SHM with key exists, regenerate key and try again
+            nxai_vlog( "SHM with key %s already exists. Trying again...\n", new_shm.key );
+            continue;
+        } else {
+            // Creation succesful
+            new_shm.id = hMapFile;
+            break;
+        }
+    }
 
     // Use process ID as identifier
     return new_shm;
