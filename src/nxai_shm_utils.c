@@ -45,6 +45,8 @@ static volatile long PipeSerialNumber;
 
 #define HEADER_BYTES 4
 
+#define SHM_MAX_SIZE 200 * 1024 * 1024// 200 MB
+
 char *nxai_shm_key_to_string( nxai_shm_t shm ) {
 #if defined( _MSC_VER )
     // Windows implementation
@@ -406,7 +408,7 @@ size_t nxai_pipe_poll( bidirectional_pipe_t *pipes_array, size_t pipes_length, P
             }
         } else {
             char error_string[1024];
-            DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+            DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
             nxai_vlog( "Warning: Could not get overlapped result: %.*s\n", error_length, error_string );
             return pipes_length;
         }
@@ -656,20 +658,20 @@ nxai_shm_t nxai_shm_create_random( size_t size ) {
 
         // Create file mapping object
         HANDLE hMapFile = CreateFileMappingA(
-                INVALID_HANDLE_VALUE,// Use paging file
-                &saAttr,             // Default security attributes
-                PAGE_READWRITE,      // Read/write access
-                0,                   // High DWORD of size
-                size + HEADER_BYTES, // Low DWORD of size
-                new_shm.key          // Name of mapping object
+                INVALID_HANDLE_VALUE,        // Use paging file
+                &saAttr,                     // Default security attributes
+                PAGE_READWRITE | SEC_RESERVE,// Read/write access
+                0,                           // High DWORD of size
+                SHM_MAX_SIZE,                // Low DWORD of size
+                new_shm.key                  // Name of mapping object
         );
 
         if ( hMapFile == NULL ) {
             char error_string[1024];
-            get_windows_error( WSAGetLastError(), error_string, 1024 );
+            get_windows_error( GetLastError(), error_string, 1024 );
             nxai_vlog( "Warning: Could not create SHM: %s\n", error_string );
             break;
-        } else if ( WSAGetLastError() == ERROR_ALREADY_EXISTS ) {
+        } else if ( GetLastError() == ERROR_ALREADY_EXISTS ) {
             // SHM with key exists, regenerate key and try again
             nxai_vlog( "SHM with key %s already exists. Trying again...\n", new_shm.key );
             continue;
@@ -679,6 +681,9 @@ nxai_shm_t nxai_shm_create_random( size_t size ) {
             break;
         }
     }
+
+    // Commit memory
+    nxai_shm_realloc( &new_shm, size );
 
     // Use process ID as identifier
     return new_shm;
@@ -707,13 +712,16 @@ nxai_shm_t nxai_shm_create( const char *path, int project_id, size_t size ) {
     saAttr.lpSecurityDescriptor = NULL;
 
     new_shm.id = CreateFileMappingA(
-            INVALID_HANDLE_VALUE,// Use paging file
-            &saAttr,             // Security attributes
-            PAGE_READWRITE,      // Read/write access
-            0,                   // High DWORD of size
-            size + HEADER_BYTES, // Low DWORD of size
-            new_shm.key          // Name of mapping object
+            INVALID_HANDLE_VALUE,        // Use paging file
+            &saAttr,                     // Security attributes
+            PAGE_READWRITE | SEC_RESERVE,// Read/write access
+            0,                           // High DWORD of size
+            SHM_MAX_SIZE,                // Low DWORD of size
+            new_shm.key                  // Name of mapping object
     );
+
+    // Commit memory
+    nxai_shm_realloc( &new_shm, size );
 
     // Use process ID as identifier
     return new_shm;
@@ -734,7 +742,7 @@ bool nxai_shm_get_id( nxai_shm_t *shm ) {
     HANDLE shm_id = OpenFileMappingA( FILE_MAP_ALL_ACCESS, FALSE, shm->key );
     if ( shm_id == NULL ) {
         char error_string[1024];
-        DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+        DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
         nxai_vlog( "Warning: Could not get SHM ID: %.*s\n", error_length, error_string );
         return false;
     } else {
@@ -774,7 +782,7 @@ void *nxai_shm_attach( nxai_shm_t shm ) {
     );
     if ( shm_pointer == NULL ) {
         char error_string[1024];
-        DWORD error_length = get_windows_error( WSAGetLastError(), error_string, 1024 );
+        DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
         nxai_vlog( "Warning: Could not attach shared memory: %.*s\n", error_length, error_string );
     }
 
@@ -812,6 +820,9 @@ bool nxai_shm_write( const nxai_shm_t *shm, const char *data, uint32_t size ) {
             size + HEADER_BYTES );
 
     if ( view == NULL ) {
+        char error_string[1024];
+        DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
+        nxai_vlog( "Warning: Could not obtain shared memory for writing: %.*s\n", error_length, error_string );
         return false;
     }
 
@@ -856,6 +867,9 @@ void *nxai_shm_read( nxai_shm_t *shm, size_t *data_length, char **payload_data )
             0 );
 
     if ( view == NULL ) {
+        char error_string[1024];
+        DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
+        nxai_vlog( "Warning: Could not read shared memory: %.*s\n", error_length, error_string );
         return NULL;
     }
 
@@ -898,21 +912,10 @@ int nxai_shm_destroy( const nxai_shm_t *shm ) {
 bool nxai_shm_realloc( nxai_shm_t *shm, size_t new_size ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    CloseHandle( shm->id );
-
-    SECURITY_ATTRIBUTES saAttr;
-    saAttr.nLength = sizeof( SECURITY_ATTRIBUTES );
-    saAttr.bInheritHandle = TRUE;
-    saAttr.lpSecurityDescriptor = NULL;
-
-    shm->id = CreateFileMappingW(
-            INVALID_HANDLE_VALUE,
-            &saAttr,
-            PAGE_READWRITE,
-            0,
-            new_size + HEADER_BYTES,
-            shm->key );
-
+    // Commit memory to ensure space on disk
+    void *base_address = nxai_shm_attach( *shm );
+    VirtualAlloc( base_address, new_size + HEADER_BYTES, MEM_COMMIT, PAGE_READWRITE );
+    UnmapViewOfFile( base_address );
     return true;
 #else
     // Linux implementation
