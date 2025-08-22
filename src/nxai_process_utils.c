@@ -739,19 +739,32 @@ int nxai_kill_process( nxai_process_t process ) {
 #if defined( _MSC_VER )
     // Windows implementation
 
+    DWORD exitCode = 9;
     HANDLE hProcess = OpenProcess( PROCESS_TERMINATE | PROCESS_QUERY_INFORMATION,
                                    FALSE, process );
-    if ( hProcess == NULL ) {
-        return ERROR_INVALID_HANDLE;
-    }
+    if ( hProcess != NULL ) {
+        // Terminate the process
+        nxai_vlog( "Sending termination signal...\n" );
+        if ( !TerminateProcess( hProcess, 9 ) ) {
+            CloseHandle( hProcess );
+            return false;
+        }
 
-    // Force termination if graceful shutdown failed
-    DWORD exitCode;
-    if ( GetExitCodeProcess( hProcess, &exitCode ) && exitCode != STILL_ACTIVE ) {
-        TerminateProcess( hProcess, 1 );
-    }
+        // Wait for process to exit
+        nxai_vlog( "Waiting for exit\n" );
+        DWORD waitResult = WaitForSingleObject( hProcess, INFINITE );
+        nxai_vlog( "Done waiting\n" );
 
-    CloseHandle( hProcess );
+        if ( waitResult == WAIT_OBJECT_0 ) {
+            // Process terminated successfully
+            nxai_vlog( "Exited succesfully\n" );
+            CloseHandle( hProcess );
+            return 0;
+        }
+
+        GetExitCodeProcess( hProcess, &exitCode );
+        CloseHandle( hProcess );
+    }
     return exitCode;
 #else
     // Linux implementation
