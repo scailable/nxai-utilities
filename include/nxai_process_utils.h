@@ -135,8 +135,6 @@ char *nxai_read_pipe_to_string( nxai_pipe_t pipe );
 
 int nxai_kill_process( nxai_process_t process );
 
-int nxai_shutdown_process( nxai_process_t process );
-
 bool nxai_check_process_status( nxai_process_t process, int *status );
 
 void nxai_lock_mutex( nxai_mutex_t *mutex );

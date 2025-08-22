@@ -659,7 +659,7 @@ int nxai_process_wait( nxai_process_t process_id, int timeout_seconds ) {
         case WAIT_TIMEOUT: {
             TerminateProcess( hProcess, 1 );
             CloseHandle( hProcess );
-            return -1;
+            return -2;
         }
         default:
             CloseHandle( hProcess );
@@ -703,7 +703,7 @@ int nxai_process_wait( nxai_process_t process_id, int timeout_seconds ) {
         return WEXITSTATUS( status );
     } else if ( sig == -1 && errno == ETIMEDOUT ) {
         // Timeout expired before child finished
-        return -1;// Indicate timeout
+        return -2;// Indicate timeout
     } else {
         // Error in sigtimedwait
         return -1;
@@ -768,46 +768,8 @@ int nxai_kill_process( nxai_process_t process ) {
     return exitCode;
 #else
     // Linux implementation
-    return kill( process, SIGTERM );
+    return kill( process, SIGKILL );
 #endif
-}
-
-int nxai_shutdown_process( nxai_process_t process ) {
-#if defined( _MSC_VER )
-    // Windows implementation
-    // Get handle to process with full permissions
-    HANDLE hProcess = OpenProcess( PROCESS_TERMINATE | PROCESS_QUERY_INFORMATION,
-                                   FALSE, process );
-
-    if ( hProcess == NULL ) {
-        return 0;// Process wasn't running
-    }
-
-    // Try graceful shutdown first (equivalent to SIGTERM)
-    if ( !PostMessage( FindWindow( NULL, NULL ), WM_CLOSE, 0, 0 ) ) {
-        // Fall back to force termination if windowless process
-        TerminateProcess( hProcess, 0 );
-    }
-
-    DWORD status;
-    GetExitCodeProcess( hProcess, &status );
-
-#else
-    // Linux implementation
-    // Send SIGTERM to the process
-    int result = kill( process, SIGTERM );
-    if ( result == -1 ) {
-        // Process wasn't running. Consider not running
-        return 0;
-    }
-
-    // Wait for the child process to finish
-    int status;
-    waitpid( process, &status, 0 );
-
-#endif
-    nxai_vlog( "Prcess finished with status: %d\n", status );
-    return status;
 }
 
 bool nxai_check_process_status( nxai_process_t process, int *status ) {
