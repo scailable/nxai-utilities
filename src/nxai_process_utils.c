@@ -878,7 +878,7 @@ void nxai_process_set_sigs( nxai_handler_return_t ( *handler )( nxai_signal_t ) 
     // the error occurs rather than in a SIGPIPE handler.
     signal( SIGPIPE, SIG_IGN );
 
+#endif
     // Set death signal when parent is terminated
     nxai_ensure_child_cleanup();
-#endif
 }
