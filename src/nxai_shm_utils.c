@@ -479,6 +479,8 @@ size_t nxai_pipe_poll( bidirectional_pipe_t *pipes_array, size_t pipes_length, P
     }
 
     free( poll_fds );
+
+    return index;
 #endif
 }
 
@@ -766,7 +768,7 @@ bool nxai_shm_valid( void *shm_buffer ) {
     return shm_buffer != NULL;// In Windows the pointer will be NULL if mapping failed
 #else
     // Linux implementation
-    return shm_pointer != (void *) -1;// In Linux the pointer will be -1 if mapping failed
+    return shm_buffer != (void *) -1;// In Linux the pointer will be -1 if mapping failed
 #endif
 }
 

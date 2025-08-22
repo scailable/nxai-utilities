@@ -515,6 +515,7 @@ bool nxai_process_started( nxai_process_t process ) {
     return true;
 }
 
+#if defined( _MSC_VER )
 static char *convert_input_arguments( char *const argv[] ) {
     // Determine length of string
     int index = 0;
@@ -551,6 +552,7 @@ static char *convert_input_arguments( char *const argv[] ) {
     argument_string[current_index - 1] = 0;
     return argument_string;
 }
+#endif
 
 nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxai_pipe_t *stderr_pipe ) {
 #if defined( _MSC_VER )
@@ -750,9 +752,10 @@ int nxai_kill_process( nxai_process_t process ) {
     }
 
     CloseHandle( hProcess );
+    return exitCode;
 #else
     // Linux implementation
-    kill( process, SIGTERM );
+    return kill( process, SIGTERM );
 #endif
 }
 
