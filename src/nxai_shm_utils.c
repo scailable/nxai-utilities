@@ -587,6 +587,8 @@ char nxai_pipe_timed_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION directio
     return -3;// No data available
 #else
     // Linux implementation
+    nxai_pipe_t read_pipe = nxai_pipe_get_read_pipe( pipe_fd, direction );
+
     char buffer;
     fd_set read_fds;
     struct timeval tv;
@@ -594,19 +596,20 @@ char nxai_pipe_timed_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION directio
 
     // Set up select parameters
     FD_ZERO( &read_fds );
-    FD_SET( nxai_pipe_get_read_pipe( pipe_fd, direction ), &read_fds );
+    FD_SET( read_pipe, &read_fds );
     tv.tv_sec = timeout_s;
     tv.tv_usec = 0;
 
     // Wait for data or timeout_s
-    if ( select( nxai_pipe_get_read_pipe( pipe_fd, direction ) + 1, &read_fds, NULL, NULL, &tv ) <= 0 ) {
+    int select_return = select( read_pipe + 1, &read_fds, NULL, NULL, &tv );
+    if ( select_return <= 0 ) {
         return -3;
     }
 
     // Read data if available
-    bytes_read = read( nxai_pipe_get_read_pipe( pipe_fd, direction ), &buffer, 1 );
+    bytes_read = read( read_pipe, &buffer, 1 );
     if ( bytes_read == -1 ) {
-        printf( "Error in read function during pipe timed read: %s\n", strerror( errno ) );
+        nxai_error_log( "Error in read function during pipe timed read: %s\n", strerror( errno ) );
         return -1;
     }
     if ( bytes_read == 0 ) {
@@ -916,7 +919,15 @@ bool nxai_shm_realloc( nxai_shm_t *shm, size_t new_size ) {
     // Windows implementation
     // Commit memory to ensure space on disk
     void *base_address = nxai_shm_attach( *shm );
-    VirtualAlloc( base_address, new_size + HEADER_BYTES, MEM_COMMIT, PAGE_READWRITE );
+    if ( base_address == NULL ) {
+        return false;
+    }
+    if ( VirtualAlloc( base_address, new_size + HEADER_BYTES, MEM_COMMIT, PAGE_READWRITE ) == NULL ) {
+        char error_string[1024];
+        DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Could not realloc shared memory: %.*s\n", error_length, error_string );
+        return false;
+    };
     UnmapViewOfFile( base_address );
     return true;
 #else

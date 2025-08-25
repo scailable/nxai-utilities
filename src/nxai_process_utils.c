@@ -202,7 +202,7 @@ bool nxai_thread_create( nxai_thread_t *thread, function_ptr function, void *inp
     return true;
 #else
     // Linux implementation
-    int ret = pthread_create( thread, NULL, (void *) function, NULL );
+    int ret = pthread_create( thread, NULL, (void *) function, input_arguments );
     return ret == 0;
 #endif
 }
