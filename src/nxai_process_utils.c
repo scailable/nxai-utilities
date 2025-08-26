@@ -688,25 +688,28 @@ int nxai_process_wait( nxai_process_t process_id, int timeout_seconds ) {
     }
 
     // Set up timeout
-    struct timespec ts;
-    clock_gettime( CLOCK_REALTIME, &ts );
-    ts.tv_sec += timeout_seconds;
+    struct timespec ts = {
+            .tv_sec = timeout_seconds,
+            .tv_nsec = 0,
+    };
 
-    int sig;
-    while ( ( sig = sigtimedwait( &mask, NULL, &ts ) ) == -1 && errno == EINTR );
+    while ( 1 ) {
+        // Reset timeout for each iteration
+        int sig = sigtimedwait( &mask, NULL, &ts );
 
-    // Check if SIGCHLD was received or timeout occurred
-    if ( sig == SIGCHLD ) {
-        // Child process finished within timeout
-        int status;
-        waitpid( process_id, &status, WNOHANG );
-        return WEXITSTATUS( status );
-    } else if ( sig == -1 && errno == ETIMEDOUT ) {
-        // Timeout expired before child finished
-        return -2;// Indicate timeout
-    } else {
-        // Error in sigtimedwait
-        return -1;
+        if ( sig == SIGCHLD ) {
+            int status;
+            waitpid( process_id, &status, WNOHANG );
+            return WEXITSTATUS( status );
+        } else if ( sig == -1 ) {
+            if ( errno == ETIMEDOUT ) {
+                return -2;// Timeout expired
+            } else if ( errno != EINTR ) {
+                return -1;// Other errors
+            }
+            // Handle EINTR by breaking
+            break;
+        }
     }
 #endif
 }
