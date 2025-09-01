@@ -63,7 +63,7 @@ char *nxai_shm_key_to_string( nxai_shm_t shm ) {
 void nxai_shm_key_from_string( nxai_shm_t *shm, const char *str ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    // Convert string to integer using atoi
+    shm->key = malloc( sizeof( char ) * MAX_PATH );
     strcpy( shm->key, str );
 #else
     // Linux implementation
@@ -609,14 +609,14 @@ nxai_shm_t nxai_shm_create_random( size_t size ) {
     // Windows implementation
     nxai_shm_t new_shm;
     new_shm.id = NULL;
+    new_shm.key = malloc( sizeof( char ) * MAX_PATH );
 
     SECURITY_ATTRIBUTES saAttr;
     saAttr.nLength = sizeof( SECURITY_ATTRIBUTES );
     saAttr.bInheritHandle = TRUE;
     saAttr.lpSecurityDescriptor = NULL;
 
-    size_t retry_counter = 0;
-    while ( retry_counter < 5 ) {
+    for ( size_t retry_counter = 0; retry_counter < 5; retry_counter++ ) {
         // Generate random name for anonymous mapping
         sprintf_s( new_shm.key, MAX_PATH, "Global_RandomSHM_%08X", rand() );
 

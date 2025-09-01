@@ -22,18 +22,16 @@ typedef SSIZE_T ssize_t;
 #if defined( _MSC_VER )
 typedef HANDLE nxai_pipe_t;
 typedef HANDLE shm_id_t;
-typedef struct {
-    LPCSTR key[MAX_PATH];
-    shm_id_t id;
-} nxai_shm_t;
+typedef LPSTR shm_key_t;
 #else
 typedef int nxai_pipe_t;
 typedef int shm_id_t;
+typedef key_t shm_key_t;
+#endif
 typedef struct {
-    key_t key;
+    shm_key_t key;
     shm_id_t id;
 } nxai_shm_t;
-#endif
 
 typedef struct bidirectional_pipe_t {
     nxai_pipe_t up_pipe[2];
