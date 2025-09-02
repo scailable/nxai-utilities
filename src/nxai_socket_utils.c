@@ -498,6 +498,8 @@ int32_t nxai_socket_start_listener( const char *socket_path, void ( *callback_fu
         free( message_input_buffer );
     }
 
+    closesocket( socket_fd );
+
     // Delete socket file
     DeleteFileA( socket_path );
 
