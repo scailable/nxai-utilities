@@ -613,6 +613,8 @@ void nxai_pipe_close( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
 }
 
 nxai_shm_t nxai_shm_create_random( size_t size ) {
+    // Seed randomizer to ensure unique SHM names
+    srand( nxai_current_timestamp_us() );
 #if defined( _MSC_VER )
     // Windows implementation
     nxai_shm_t new_shm;
