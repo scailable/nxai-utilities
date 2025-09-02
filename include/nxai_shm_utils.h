@@ -67,7 +67,7 @@ bidirectional_pipe_t nxai_initialize_pipe( nxai_pipe_t up_pipe_read, nxai_pipe_t
 
 bidirectional_pipe_t nxai_create_pipe( int *error );
 
-size_t nxai_pipe_timed_read_many( bidirectional_pipe_t *pipes_array, size_t pipes_length, PIPE_DIRECTION direction, int8_t *return_byte );
+size_t nxai_pipe_timed_read_any( bidirectional_pipe_t *pipes_array, size_t pipes_length, PIPE_DIRECTION direction, int8_t *return_byte );
 
 char nxai_pipe_read( bidirectional_pipe_t pipe, PIPE_DIRECTION direction );
 

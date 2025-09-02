@@ -306,7 +306,7 @@ bidirectional_pipe_t nxai_create_pipe( int *error ) {
 #endif
 }
 
-size_t nxai_pipe_timed_read_many( bidirectional_pipe_t *pipes_array, size_t pipes_length, PIPE_DIRECTION direction, int8_t *return_byte ) {
+size_t nxai_pipe_timed_read_any( bidirectional_pipe_t *pipes_array, size_t pipes_length, PIPE_DIRECTION direction, int8_t *return_byte ) {
     const int timeout_ms = 1000;
 
 #if defined( _MSC_VER )
@@ -356,7 +356,15 @@ size_t nxai_pipe_timed_read_many( bidirectional_pipe_t *pipes_array, size_t pipe
 
     if ( result == WAIT_TIMEOUT ) {
         // Handle timeout case
-        nxai_vlog_verbose( "Timed out waiting for client output\n" );
+        nxai_vlog_verbose( "Timed out waiting for pipe read.\n" );
+
+        // Cancel all pending I/O operations
+        for ( size_t i = 0; i < pipes_length; i++ ) {
+            CancelIo( nxai_pipe_get_read_pipe( pipes_array[i], direction ) );
+
+            // Reset event to clear pending state
+            ResetEvent( overlaps[i].hEvent );
+        }
     } else if ( result >= WAIT_OBJECT_0 && result < WAIT_OBJECT_0 + pipes_length ) {
         completed_index = result - WAIT_OBJECT_0;
 
@@ -406,7 +414,7 @@ size_t nxai_pipe_timed_read_many( bidirectional_pipe_t *pipes_array, size_t pipe
     }
 
     if ( ready == 0 ) {
-        nxai_vlog( "Timed out waiting for client output\n" );
+        nxai_vlog( "Timed out waiting for for pipe read.\n" );
         free( poll_fds );
         return pipes_length;
     }
