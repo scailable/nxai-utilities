@@ -721,7 +721,7 @@ char *nxai_read_pipe_to_string( nxai_pipe_t pipe ) {
 #if defined( _MSC_VER )
     // Windows implementation
     DWORD bytes_read;
-    while ( ( bytes_read = ReadFile( pipe, buffer, sizeof( buffer ), &bytes_read, NULL ) ) > 0 ) {
+    while ( ( bytes_read = ReadFile( pipe->handle, buffer, sizeof( buffer ), &bytes_read, NULL ) ) > 0 ) {
         out_string = realloc( out_string, total_bytes_read + bytes_read );
         memcpy( out_string + total_bytes_read, buffer, bytes_read );
         total_bytes_read += bytes_read;

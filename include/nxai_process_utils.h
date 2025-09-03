@@ -16,7 +16,7 @@ extern "C" {
 #include <ioapiset.h>
 #include <processthreadsapi.h>
 #include <synchapi.h>
-typedef HANDLE nxai_pipe_t;
+#include "nxai_shm_utils.h"
 typedef DWORD nxai_process_t;
 typedef HANDLE nxai_thread_t;
 typedef HANDLE nxai_mutex_t;

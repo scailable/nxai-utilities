@@ -20,7 +20,15 @@ typedef SSIZE_T ssize_t;
 
 // Platform types
 #if defined( _MSC_VER )
-typedef HANDLE nxai_pipe_t;
+typedef struct {
+    OVERLAPPED overlap;
+    HANDLE event;
+    HANDLE handle;
+    char read_buffer;
+    bool active;
+} _nxai_pipe_t;
+typedef _nxai_pipe_t *nxai_pipe_t;
+#define NXAI_PIPE_INITIALIZER { { 0 }, INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE, 0, false }
 typedef HANDLE shm_id_t;
 typedef LPSTR shm_key_t;
 #else

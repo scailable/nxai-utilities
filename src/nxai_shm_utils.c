@@ -145,7 +145,7 @@ char *nxai_pointer_to_string( void *pointer ) {
 char *nxai_pipe_to_string( nxai_pipe_t pipe ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    char *pipe_string = nxai_pointer_to_string( pipe );
+    char *pipe_string = nxai_pointer_to_string( pipe->handle );
 #else
     // Linux implementation
     char *pipe_string = nxai_sprintf( 32, "%d", pipe );
@@ -162,12 +162,16 @@ nxai_pipe_t nxai_string_to_pipe( const char *str ) {
     sscanf_s( str, "%p", &hPipe );
 
     // Validate the handle
+    nxai_pipe_t return_pipe = malloc( sizeof( _nxai_pipe_t ) );
+    *return_pipe = (_nxai_pipe_t) NXAI_PIPE_INITIALIZER;
     DWORD dflags;
     if ( hPipe == INVALID_HANDLE_VALUE || !GetHandleInformation( hPipe, &dflags ) ) {
-        return INVALID_HANDLE_VALUE;
+        return return_pipe;
     }
 
-    return hPipe;
+    return_pipe->handle = hPipe;
+
+    return return_pipe;
 #else
     // Linux implementation
     int pipe_fd;
@@ -196,6 +200,7 @@ nxai_pipe_t nxai_pipe_get_write_pipe( bidirectional_pipe_t pipe, PIPE_DIRECTION 
 }
 
 nxai_pipe_t nxai_pipe_get_read_pipe( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
+    nxai_pipe_t p = direction == UP ? pipe.up_pipe[0] : pipe.down_pipe[0];
     return direction == UP ? pipe.up_pipe[0] : pipe.down_pipe[0];
 }
 
@@ -204,11 +209,26 @@ bidirectional_pipe_t nxai_initialize_pipe( nxai_pipe_t up_pipe_read, nxai_pipe_t
     return created_pipe;
 }
 
+#if defined( _MSC_VER )
+static nxai_pipe_t create_pipe() {
+    nxai_pipe_t new_pipe = malloc( sizeof( _nxai_pipe_t ) );
+    *new_pipe = (_nxai_pipe_t) NXAI_PIPE_INITIALIZER;
+    return new_pipe;
+}
+#endif
+
 bidirectional_pipe_t nxai_create_pipe( int *error ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    bidirectional_pipe_t created_pipe = { { INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE },
-                                          { INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE } };
+    typedef struct {
+        OVERLAPPED overlap;
+        HANDLE event;
+        HANDLE pipe;
+        char read_buffer;
+        bool active;
+    } nxai_pipe_t;
+    bidirectional_pipe_t created_pipe = { { create_pipe(), create_pipe() },
+                                          { create_pipe(), create_pipe() } };
 
     SECURITY_ATTRIBUTES saAttr;
     saAttr.nLength = sizeof( SECURITY_ATTRIBUTES );
@@ -245,8 +265,8 @@ bidirectional_pipe_t nxai_create_pipe( int *error ) {
             NULL// Template file
     );
 
-    created_pipe.up_pipe[0] = UpReadPipeHandle;
-    created_pipe.up_pipe[1] = UpWritePipeHandle;
+    created_pipe.up_pipe[0]->handle = UpReadPipeHandle;
+    created_pipe.up_pipe[1]->handle = UpWritePipeHandle;
 
     // Create down pipe name
     UCHAR DownPipeNameBuffer[MAX_PATH];
@@ -278,8 +298,8 @@ bidirectional_pipe_t nxai_create_pipe( int *error ) {
             NULL// Template file
     );
 
-    created_pipe.down_pipe[0] = DownReadPipeHandle;
-    created_pipe.down_pipe[1] = DownWritePipeHandle;
+    created_pipe.down_pipe[0]->handle = DownReadPipeHandle;
+    created_pipe.down_pipe[1]->handle = DownWritePipeHandle;
 
     *error = 0;
     return created_pipe;
@@ -318,32 +338,38 @@ size_t nxai_pipe_timed_read_any( bidirectional_pipe_t *pipes_array, size_t pipes
         return pipes_length;
     }
 
-    OVERLAPPED *overlaps = (OVERLAPPED *) malloc( sizeof( OVERLAPPED ) * pipes_length );
     HANDLE *handles = (HANDLE *) malloc( sizeof( HANDLE ) * pipes_length );
-    char *read_buffers = (char *) malloc( sizeof( char ) * pipes_length );
 
     // Initialize OVERLAPPED structures
     for ( size_t pipe_index = 0; pipe_index < pipes_length; pipe_index++ ) {
-        ZeroMemory( &overlaps[pipe_index], sizeof( OVERLAPPED ) );
-        overlaps[pipe_index].hEvent = CreateEventA( NULL, TRUE, FALSE, NULL );
-        handles[pipe_index] = overlaps[pipe_index].hEvent;
-
-        nxai_pipe_t read_handle = nxai_pipe_get_read_pipe( pipes_array[pipe_index], direction );
-        DWORD bytesRead = 0;
+        nxai_pipe_t read_pipe = nxai_pipe_get_read_pipe( pipes_array[pipe_index], direction );
+        if ( read_pipe->active == true ) {
+            handles[pipe_index] = read_pipe->overlap.hEvent;
+            continue;// Already initialized
+        }
+        ZeroMemory( &( read_pipe->overlap ), sizeof( OVERLAPPED ) );
+        read_pipe->overlap.hEvent = CreateEventA( NULL, TRUE, FALSE, NULL );
+        handles[pipe_index] = read_pipe->overlap.hEvent;
 
         // Start overlapped read operation
-        if ( !ReadFile( read_handle, &( read_buffers[pipe_index] ), 1, &bytesRead, &overlaps[pipe_index] ) ) {
+        DWORD bytesRead;
+        if ( !ReadFile( read_pipe->handle, &( read_pipe->read_buffer ), 1, &bytesRead, &( read_pipe->overlap ) ) ) {
             DWORD lastError = GetLastError();
             if ( lastError != ERROR_IO_PENDING ) {
+                char error_string[1024];
+                get_windows_error( lastError, error_string, 1024 );
+                nxai_vlog( "Could not read pipe: %s\n", error_string );
                 // Cleanup events
                 for ( size_t j = 0; j <= pipe_index; j++ ) {
-                    CloseHandle( overlaps[j].hEvent );
+                    CloseHandle( nxai_pipe_get_read_pipe( pipes_array[j], direction )->overlap.hEvent );
                 }
-                free( overlaps );
                 free( handles );
+                raise( SIGABRT );
                 return pipes_length;
             }
         }
+        // Signal that pipe is waiting for read operation
+        read_pipe->active = true;
     }
 
     // Wait for any operation to complete
@@ -357,36 +383,34 @@ size_t nxai_pipe_timed_read_any( bidirectional_pipe_t *pipes_array, size_t pipes
     if ( result == WAIT_TIMEOUT ) {
         // Handle timeout case
         nxai_vlog_verbose( "Timed out waiting for pipe read.\n" );
-
-        // Cancel all pending I/O operations
-        for ( size_t i = 0; i < pipes_length; i++ ) {
-            CancelIo( nxai_pipe_get_read_pipe( pipes_array[i], direction ) );
-
-            // Reset event to clear pending state
-            ResetEvent( overlaps[i].hEvent );
-        }
     } else if ( result >= WAIT_OBJECT_0 && result < WAIT_OBJECT_0 + pipes_length ) {
         completed_index = result - WAIT_OBJECT_0;
-
+        //Signal no longer waiting for result on this pipe
+        nxai_vlog( "Completed: %zu\n", completed_index );
+        nxai_pipe_t completed_pipe = nxai_pipe_get_read_pipe( pipes_array[completed_index], direction );
+        completed_pipe->active = false;
         // Get the result of the completed operation
         DWORD bytesRead = 0;
-        if ( GetOverlappedResult( nxai_pipe_get_read_pipe( pipes_array[completed_index], direction ),
-                                  &overlaps[completed_index],
+        nxai_vlog( "Getting overlapped: \n" );
+        if ( GetOverlappedResult( completed_pipe->handle,
+                                  &( completed_pipe->overlap ),
                                   &bytesRead,
                                   TRUE ) ) {
+            nxai_vlog( "Bytes read: %zu %d\n", bytesRead, completed_pipe->read_buffer );
             if ( bytesRead > 0 ) {
-                *return_byte = read_buffers[completed_index];
+                *return_byte = completed_pipe->read_buffer;
             }
         }
+        CloseHandle( completed_pipe->overlap.hEvent );
+    } else {
+        char error_string[1024];
+        get_windows_error( GetLastError(), error_string, 1024 );
+        nxai_vlog( "Error! Failed waiting for any pipe: %s\n", error_string );
+        raise( SIGABRT );
     }
 
     // Cleanup
-    for ( size_t i = 0; i < pipes_length; i++ ) {
-        CloseHandle( overlaps[i].hEvent );
-    }
-    free( overlaps );
     free( handles );
-    free( read_buffers );
     return completed_index;
 
 #else
@@ -456,7 +480,7 @@ char nxai_pipe_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction ) {
     // Windows implementation
     char buffer;
     DWORD bytes_read;
-    if ( !ReadFile( nxai_pipe_get_read_pipe( pipe_fd, direction ), &buffer, 1, &bytes_read, NULL ) ) {
+    if ( !ReadFile( nxai_pipe_get_read_pipe( pipe_fd, direction )->handle, &buffer, 1, &bytes_read, NULL ) ) {
         return -1;
     }
     if ( bytes_read == 0 ) {
@@ -485,7 +509,7 @@ ssize_t nxai_pipe_send( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION direction, 
 #if defined( _MSC_VER )
     // Windows implementation
     DWORD bytes_written;
-    if ( !WriteFile( nxai_pipe_get_write_pipe( pipe_fd, direction ), &signal, 1, &bytes_written, NULL ) ) {
+    if ( !WriteFile( nxai_pipe_get_write_pipe( pipe_fd, direction )->handle, &signal, 1, &bytes_written, NULL ) ) {
         return -1;
     }
     return bytes_written;
@@ -501,7 +525,7 @@ char nxai_pipe_timed_read( bidirectional_pipe_t pipe_fd, PIPE_DIRECTION directio
     char buffer;
     DWORD bytes_read;
     OVERLAPPED overlapped = { 0 };
-    HANDLE pipe_handle = nxai_pipe_get_read_pipe( pipe_fd, direction );
+    HANDLE pipe_handle = nxai_pipe_get_read_pipe( pipe_fd, direction )->handle;
 
     // Initialize overlapped structure
     overlapped.hEvent = CreateEventA( NULL, TRUE, FALSE, NULL );
@@ -591,11 +615,11 @@ void nxai_pipe_close( bidirectional_pipe_t pipe, PIPE_DIRECTION direction ) {
 #if defined( _MSC_VER )
     // Windows implementation
     if ( direction == DOWN ) {
-        CloseHandle( nxai_pipe_get_write_pipe( pipe, UP ) );
-        CloseHandle( nxai_pipe_get_read_pipe( pipe, DOWN ) );
+        CloseHandle( nxai_pipe_get_write_pipe( pipe, UP )->handle );
+        CloseHandle( nxai_pipe_get_read_pipe( pipe, DOWN )->handle );
     } else {
-        CloseHandle( nxai_pipe_get_write_pipe( pipe, DOWN ) );
-        CloseHandle( nxai_pipe_get_read_pipe( pipe, UP ) );
+        CloseHandle( nxai_pipe_get_write_pipe( pipe, DOWN )->handle );
+        CloseHandle( nxai_pipe_get_read_pipe( pipe, UP )->handle );
     }
 #else
     // Linux implementation
