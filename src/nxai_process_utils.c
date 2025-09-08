@@ -248,47 +248,17 @@ void nxai_sleep_ms( int milliseconds ) {
 }
 
 uint64_t nxai_current_timestamp_ms() {
-#if defined( _MSC_VER )
-    // Windows implementation
-    FILETIME ft;
-    ULARGE_INTEGER ui;
-
-    GetSystemTimeAsFileTime( &ft );
-    ui.LowPart = ft.dwLowDateTime;
-    ui.HighPart = ft.dwHighDateTime;
-
-    // Convert from 100ns intervals to milliseconds
-    const uint64_t HUNDRED_NANOSECONDS_TO_MILLISECONDS = 10000;
-    return ui.QuadPart / HUNDRED_NANOSECONDS_TO_MILLISECONDS;
-#else
-    // Linux implementation
-    struct timeval te;
-    gettimeofday( &te, NULL );                                    // get current time
-    int64_t milliseconds = te.tv_sec * 1000LL + te.tv_usec / 1000;// calculate milliseconds
-    return milliseconds;
-#endif
+    struct timespec ts;
+    timespec_get( &ts, TIME_UTC );
+    uint64_t time_ms = ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+    return time_ms;
 }
 
 uint64_t nxai_current_timestamp_us() {
-#if defined( _MSC_VER )
-    // Windows implementation
-    FILETIME ft;
-    ULARGE_INTEGER ui;
-
-    GetSystemTimeAsFileTime( &ft );
-    ui.LowPart = ft.dwLowDateTime;
-    ui.HighPart = ft.dwHighDateTime;
-
-    // Convert from 100ns intervals to microseconds
-    const uint64_t HUNDRED_NANOSECONDS_TO_MICROSECONDS = 10;
-    return ui.QuadPart / HUNDRED_NANOSECONDS_TO_MICROSECONDS;
-#else
-    // Linux implementation
-    struct timeval te;
-    gettimeofday( &te, NULL );// get current time
-    int64_t microseconds = te.tv_sec * 1000000LL + te.tv_usec;
-    return microseconds;
-#endif
+    struct timespec ts;
+    timespec_get( &ts, TIME_UTC );
+    uint64_t time_us = ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+    return time_us;
 }
 
 #if defined( _WIN32 ) || defined( _WIN64 )
@@ -414,7 +384,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
     // Get the current timestamp
     uint64_t timestamp = nxai_current_timestamp_us();
 
-    int64_t duration = 0;
+    uint64_t duration = 0;
     if ( last_timestamp == 0 ) {
         last_timestamp = timestamp;
     }
@@ -429,7 +399,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
 
     if ( _log_to_console == true ) {
         // Print to console
-        printf( "%s%ld %09lld: ", _log_prefix, timestamp / 1000, (long long) duration );
+        printf( "%s%llu %09llu: ", _log_prefix, (uint64_t) timestamp / 1000, duration );
         vprintf( fmt, *args );
     }
 
@@ -482,7 +452,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
     }
 
     // Write to logfile
-    int bytes_written = fprintf( flogfile, "%s%ld %09lld: ", _log_prefix, timestamp / 1000, (long long) duration );
+    int bytes_written = fprintf( flogfile, "%s%llu %09llu: ", _log_prefix, (uint64_t) timestamp / 1000, duration );
     if ( bytes_written < 0 ) {
         printf( "Failed to write to log file!\n" );
         return;
