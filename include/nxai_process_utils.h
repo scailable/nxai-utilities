@@ -22,8 +22,6 @@ typedef HANDLE nxai_thread_t;
 typedef HANDLE nxai_mutex_t;
 typedef unsigned long nxai_thread_return_t;
 #define NXAI_THREAD_RETURN 0
-typedef DWORD nxai_signal_t;
-typedef BOOL nxai_handler_return_t;
 #else
 // Linux specific imports
 #include <spawn.h>
@@ -143,7 +141,7 @@ void nxai_unlock_mutex( nxai_mutex_t *mutex );
 
 nxai_mutex_t nxai_initialize_mutex();
 
-void nxai_process_set_sigs( nxai_handler_return_t ( *handler )( nxai_signal_t ) );
+void nxai_process_set_sigs( void ( *handler )( int ) );
 
 bool nxai_process_started( nxai_process_t process );
 

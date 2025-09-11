@@ -610,10 +610,13 @@ static void sigchld_handler( int signum ) {
 int nxai_process_wait( nxai_process_t process_id, int timeout_seconds ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_TERMINATE,
+    HANDLE hProcess = OpenProcess( PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
                                    FALSE, process_id );
 
     if ( hProcess == NULL ) {
+        char error_string[1024];
+        DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
+        nxai_vlog( "Warning: Could not get process handle: %.*s\n", error_length, error_string );
         return -1;
     }
 
@@ -627,11 +630,13 @@ int nxai_process_wait( nxai_process_t process_id, int timeout_seconds ) {
             return exitCode;
         }
         case WAIT_TIMEOUT: {
-            TerminateProcess( hProcess, 1 );
             CloseHandle( hProcess );
             return -2;
         }
         default:
+            char error_string[1024];
+            DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
+            nxai_vlog( "Warning: Could not wait for process kill: %.*s\n", error_length, error_string );
             CloseHandle( hProcess );
             return -1;
     }
@@ -713,30 +718,19 @@ int nxai_kill_process( nxai_process_t process ) {
     // Windows implementation
 
     DWORD exitCode = 9;
-    HANDLE hProcess = OpenProcess( PROCESS_TERMINATE | PROCESS_QUERY_INFORMATION,
+    HANDLE hProcess = OpenProcess( PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION,
                                    FALSE, process );
-    if ( hProcess != NULL ) {
-        // Terminate the process
-        nxai_vlog( "Sending termination signal...\n" );
-        if ( !TerminateProcess( hProcess, 9 ) ) {
-            CloseHandle( hProcess );
-            return false;
-        }
-
-        // Wait for process to exit
-        nxai_vlog( "Waiting for exit\n" );
-        DWORD waitResult = WaitForSingleObject( hProcess, INFINITE );
-        nxai_vlog( "Done waiting\n" );
-
-        if ( waitResult == WAIT_OBJECT_0 ) {
-            // Process terminated successfully
-            nxai_vlog( "Exited succesfully\n" );
-            CloseHandle( hProcess );
-            return 0;
-        }
-
-        GetExitCodeProcess( hProcess, &exitCode );
+    if ( hProcess == NULL ) {
+        char error_string[1024];
+        DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
+        nxai_vlog( "Warning: Could not get process handle to terminate: %.*s\n", error_length, error_string );
+        return -1;
+    }
+    // Terminate the process
+    nxai_vlog( "Sending termination signal...\n" );
+    if ( !TerminateProcess( hProcess, 9 ) ) {
         CloseHandle( hProcess );
+        return -1;
     }
     return exitCode;
 #else
@@ -748,8 +742,7 @@ int nxai_kill_process( nxai_process_t process ) {
 bool nxai_check_process_status( nxai_process_t process, int *status ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION,
-                                   FALSE, process );
+    HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION, FALSE, process );
 
     if ( hProcess == NULL ) {
         return false;
@@ -807,26 +800,18 @@ nxai_mutex_t nxai_initialize_mutex() {
 #endif
 }
 
-void nxai_process_set_sigs( nxai_handler_return_t ( *handler )( nxai_signal_t ) ) {
-#if defined( _MSC_VER )
-    // Windows implementation
-    // Set up console control handler
-    SetConsoleCtrlHandler( handler, TRUE );
-
-    // Windows doesn't have direct SIGPIPE equivalent
-    // Instead, we'll handle write failures in the code where they occur
-#else
-    // Linux implementation
-    signal( SIGINT, handler );
-    signal( SIGTERM, handler );
+void nxai_process_set_sigs( void ( *handler )( int ) ) {
+#if !defined( _MSC_VER )
     signal( SIGQUIT, handler );
-    signal( SIGABRT, handler );
-
     // We expect write failures to occur but we want to handle them where
     // the error occurs rather than in a SIGPIPE handler.
     signal( SIGPIPE, SIG_IGN );
-
 #endif
+    // Linux implementation
+    signal( SIGINT, handler );
+    signal( SIGTERM, handler );
+    signal( SIGABRT, handler );
+
     // Set death signal when parent is terminated
     nxai_ensure_child_cleanup();
 }
