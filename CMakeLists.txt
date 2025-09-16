@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.18)
 
 project(NxaiCUtilities)
 
@@ -13,4 +13,5 @@ add_library(nxai-c-utilities
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mpack.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/yyjson.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/nxai_data_utils.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/nxai_library_utils.c
 )
