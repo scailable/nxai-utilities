@@ -208,20 +208,7 @@ bool nxai_thread_create( nxai_thread_t *thread, function_ptr function, void *inp
 }
 
 void nxai_ensure_child_cleanup() {
-#if defined( _MSC_VER )
-    // Windows implementation
-    HANDLE job = CreateJobObject( NULL, NULL );
-    JOBOBJECT_ASSOCIATE_COMPLETION_PORT jobInfo;
-    jobInfo.CompletionPort = CreateIoCompletionPort( INVALID_HANDLE_VALUE, NULL, 1, 0 );
-    jobInfo.CompletionKey = NULL;
-
-    SetInformationJobObject( job, JobObjectAssociateCompletionPortInformation,
-                             &jobInfo, sizeof( jobInfo ) );
-
-    AssignProcessToJobObject( job, GetCurrentProcess() );
-
-    CloseHandle( job );// Parent keeps handle closed
-#else
+#if !defined( _MSC_VER )
     // Linux implementation
     prctl( PR_SET_PDEATHSIG, SIGTERM );
 #endif
@@ -473,7 +460,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
 bool nxai_process_started( nxai_process_t process ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    if ( process == 1 ) {
+    if ( process.process_id == 1 ) {
         return false;
     }
 #else
@@ -527,7 +514,6 @@ static char *convert_input_arguments( char *const argv[] ) {
 nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxai_pipe_t *stderr_pipe ) {
 #if defined( _MSC_VER )
     // Windows implementation
-
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
     ZeroMemory( &si, sizeof( si ) );
@@ -538,31 +524,79 @@ nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxa
         si.dwFlags |= STARTF_USESTDHANDLES;
         si.hStdOutput = INVALID_HANDLE_VALUE;
     }
-
     si.dwFlags |= STARTF_USESTDHANDLES;
 
     char *argument_string = convert_input_arguments( argv );
-
     nxai_vlog( "Arg string: %s\n", argument_string );
 
-    // Create process
+    // Create job object for process management
+    SECURITY_ATTRIBUTES saAttr = { 0 };
+    saAttr.nLength = sizeof( saAttr );
+    saAttr.bInheritHandle = FALSE;// Prevent handle inheritance
+
+    HANDLE job_handle = CreateJobObjectA( &saAttr, NULL );
+    if ( job_handle == NULL ) {
+        char error_string[1024];
+        DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Could not create job object for process: %.*s\n", error_length, error_string );
+        free( argument_string );
+        return (nxai_process_t) { 1, NULL };
+    }
+
+    // Configure job object limits
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION job_info = { 0 };
+    job_info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK;
+    job_info.BasicLimitInformation.PriorityClass = NORMAL_PRIORITY_CLASS;
+
+    if ( !SetInformationJobObject( job_handle, JobObjectExtendedLimitInformation,
+                                   &job_info, sizeof( job_info ) ) ) {
+        CloseHandle( job_handle );
+        free( argument_string );
+        char error_string[1024];
+        DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Could not set information for job object: %.*s\n", error_length, error_string );
+        return (nxai_process_t) { 1, NULL };
+    }
+
+    // Create process suspended
+    DWORD creation_flags = CREATE_SUSPENDED;
     if ( !CreateProcessA(
                  NULL,           // lpApplicationName
                  argument_string,// lpCommandLine
                  NULL,           // lpProcessAttributes
                  NULL,           // lpThreadAttributes
                  TRUE,           // bInheritHandles
-                 0,              // dwCreationFlags
+                 creation_flags, // dwCreationFlags
                  NULL,           // lpEnvironment
                  NULL,           // lpCurrentDirectory
                  &si,            // lpStartupInfo
                  &pi             // lpProcessInformation
                  ) ) {
-        return 1;
+        CloseHandle( job_handle );
+        free( argument_string );
+        char error_string[1024];
+        DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Could not start process: %.*s\n", error_length, error_string );
+        return (nxai_process_t) { 1, NULL };
     }
 
+    // Assign suspended process to job object
+    if ( !AssignProcessToJobObject( job_handle, pi.hProcess ) ) {
+        TerminateProcess( pi.hProcess, 0 );
+        CloseHandle( pi.hProcess );
+        CloseHandle( pi.hThread );
+        CloseHandle( job_handle );
+        free( argument_string );
+        return (nxai_process_t) { 1, NULL };
+    }
+
+    ResumeThread( pi.hThread );
     CloseHandle( pi.hThread );
-    return pi.dwProcessId;
+    CloseHandle( pi.hProcess );
+    free( argument_string );
+
+    nxai_process_t new_process = { .process_id = pi.dwProcessId, .job_handle = job_handle };
+    return new_process;
 #else
     // Linux implementation
     pid_t child_pid;
@@ -607,11 +641,11 @@ static void sigchld_handler( int signum ) {
     (void) signum;
 }
 
-int nxai_process_wait( nxai_process_t process_id, int timeout_seconds ) {
+int nxai_process_wait( nxai_process_t process, int timeout_seconds ) {
 #if defined( _MSC_VER )
     // Windows implementation
     HANDLE hProcess = OpenProcess( PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
-                                   FALSE, process_id );
+                                   FALSE, process.process_id );
 
     if ( hProcess == NULL ) {
         char error_string[1024];
@@ -627,6 +661,7 @@ int nxai_process_wait( nxai_process_t process_id, int timeout_seconds ) {
             DWORD exitCode;
             GetExitCodeProcess( hProcess, &exitCode );
             CloseHandle( hProcess );
+            CloseHandle( process.job_handle );
             return exitCode;
         }
         case WAIT_TIMEOUT: {
@@ -674,7 +709,7 @@ int nxai_process_wait( nxai_process_t process_id, int timeout_seconds ) {
 
         if ( sig == SIGCHLD ) {
             int status;
-            waitpid( process_id, &status, WNOHANG );
+            waitpid( process, &status, WNOHANG );
             return WEXITSTATUS( status );
         } else if ( sig == -1 ) {
             if ( errno == ETIMEDOUT ) {
@@ -719,7 +754,7 @@ int nxai_kill_process( nxai_process_t process ) {
 
     DWORD exitCode = 9;
     HANDLE hProcess = OpenProcess( PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION,
-                                   FALSE, process );
+                                   FALSE, process.process_id );
     if ( hProcess == NULL ) {
         char error_string[1024];
         DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
@@ -742,7 +777,7 @@ int nxai_kill_process( nxai_process_t process ) {
 bool nxai_check_process_status( nxai_process_t process, int *status ) {
 #if defined( _MSC_VER )
     // Windows implementation
-    HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION, FALSE, process );
+    HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION, FALSE, process.process_id );
 
     if ( hProcess == NULL ) {
         return false;

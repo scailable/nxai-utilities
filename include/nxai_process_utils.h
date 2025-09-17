@@ -17,7 +17,10 @@ extern "C" {
 #include <processthreadsapi.h>
 #include <synchapi.h>
 #include "nxai_shm_utils.h"
-typedef DWORD nxai_process_t;
+typedef struct nxai_process_t {
+    DWORD process_id;
+    HANDLE job_handle;
+} nxai_process_t;
 typedef HANDLE nxai_thread_t;
 typedef HANDLE nxai_mutex_t;
 typedef unsigned long nxai_thread_return_t;
