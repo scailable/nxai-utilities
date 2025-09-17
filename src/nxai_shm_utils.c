@@ -702,7 +702,7 @@ nxai_shm_t nxai_shm_create( const char *path, int project_id, size_t size ) {
 #if defined( _MSC_VER )
     // Windows implementation
     nxai_shm_t new_shm;
-    sprintf_s( new_shm.key, MAX_PATH, L"\\\\\\.\\Global\\SHM_%S_%d", path, project_id );
+    sprintf_s( new_shm.key, MAX_PATH, L"\\\\\\.\\Global\\SHM_%s_%d", path, project_id );
 
     SECURITY_ATTRIBUTES saAttr;
     saAttr.nLength = sizeof( SECURITY_ATTRIBUTES );
@@ -804,7 +804,7 @@ void nxai_shm_write_to_attached( void *shm_buffer, const char *data, uint32_t si
     // Write the data to the shared memory segment.
     // This is done by copying the data to the shared memory segment, starting from the 4th byte,
     // as the first 4 bytes are used to store the size of the data.
-    memcpy( shm_buffer + HEADER_BYTES, data, size );
+    memcpy( ( (char *) shm_buffer ) + HEADER_BYTES, data, size );
 }
 
 bool nxai_shm_write( const nxai_shm_t *shm, const char *data, uint32_t size ) {
