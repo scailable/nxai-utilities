@@ -306,16 +306,21 @@ void nxai_vlog_verbose( const char *fmt, ... ) {
 
 void nxai_error_log( const char *fmt, ... ) {
     va_list args;
+    va_list args_copy;
+
+    // Initialize both va_lists at once
+    va_start( args, fmt );
+    va_copy( args_copy, args );
 
     // First, process arguments for stderr printing
-    va_start( args, fmt );
     vfprintf( stderr, fmt, args );
-    va_end( args );
 
-    // Make a copy of the arguments for nxai_vvlog
-    va_copy( args, args );
-    nxai_vvlog( fmt, &args );
+    // Process the same arguments for vvlog
+    nxai_vvlog( fmt, &args_copy );
+
+    // Clean up both va_lists
     va_end( args );
+    va_end( args_copy );
 }
 
 void nxai_vlog( const char *fmt, ... ) {
@@ -516,18 +521,33 @@ nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxa
     // Windows implementation
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
+
     ZeroMemory( &si, sizeof( si ) );
     ZeroMemory( &pi, sizeof( pi ) );
+
     si.cb = sizeof( si );
 
     if ( !connect_console ) {
         si.dwFlags |= STARTF_USESTDHANDLES;
         si.hStdOutput = INVALID_HANDLE_VALUE;
     }
-    si.dwFlags |= STARTF_USESTDHANDLES;
+
+    // Connect stderr to the provided pipe
+    if ( stderr_pipe != NULL ) {
+        // Initialize stderr_pipe and handles
+        HANDLE hWritePipe;
+        *stderr_pipe = nxai_create_empty_pipe();
+        nxai_create_pipe_handles( &( *stderr_pipe )->handle, &hWritePipe );
+
+        // The writing end of the pipe goes to the subprocess
+        si.dwFlags |= STARTF_USESTDHANDLES;
+        si.hStdError = hWritePipe;
+
+        // Prevent the pipe handle from being inherited by other processes
+        SetHandleInformation( ( *stderr_pipe )->handle, HANDLE_FLAG_INHERIT, 0 );
+    }
 
     char *argument_string = convert_input_arguments( argv );
-    nxai_vlog( "Arg string: %s\n", argument_string );
 
     // Create job object for process management
     SECURITY_ATTRIBUTES saAttr = { 0 };
@@ -725,14 +745,40 @@ int nxai_process_wait( nxai_process_t process, int timeout_seconds ) {
 }
 
 char *nxai_read_pipe_to_string( nxai_pipe_t pipe ) {
-    char *out_string = (char *) malloc( 1024 );
+    char *out_string = malloc( sizeof( char ) * 1024 );
     size_t total_bytes_read = 0;
     char buffer[1024];
 #if defined( _MSC_VER )
     // Windows implementation
-    DWORD bytes_read;
-    while ( ( bytes_read = ReadFile( pipe->handle, buffer, sizeof( buffer ), &bytes_read, NULL ) ) > 0 ) {
-        out_string = realloc( out_string, total_bytes_read + bytes_read );
+    OVERLAPPED ov = {};
+    ov.Offset = 0;
+    ov.OffsetHigh = 0;
+
+    while ( true ) {
+        memset( &ov, 0, sizeof( OVERLAPPED ) );
+        DWORD bytes_read;
+
+        // Use OVERLAPPED I/O for non-blocking reads
+        BOOL success = ReadFile( pipe->handle, buffer, sizeof( buffer ),
+                                 &bytes_read, &ov );
+
+        if ( !success ) {
+            DWORD error = GetLastError();
+            if ( error == ERROR_IO_PENDING ) {
+                // No bytes to read
+                CancelIo( pipe->handle );
+                break;
+            } else {
+                free( out_string );
+                return NULL;
+            }
+        }
+
+        if ( bytes_read == 0 ) {
+            break;
+        }
+
+        out_string = realloc( out_string, total_bytes_read + bytes_read + 1 );
         memcpy( out_string + total_bytes_read, buffer, bytes_read );
         total_bytes_read += bytes_read;
     }
@@ -740,11 +786,12 @@ char *nxai_read_pipe_to_string( nxai_pipe_t pipe ) {
     // Linux implementation
     ssize_t bytes_read;
     while ( ( bytes_read = read( pipe, buffer, sizeof( buffer ) ) ) > 0 ) {
-        out_string = realloc( out_string, total_bytes_read + bytes_read );
+        out_string = realloc( out_string, total_bytes_read + bytes_read + 1 );
         memcpy( out_string + total_bytes_read, buffer, bytes_read );
         total_bytes_read += bytes_read;
     }
 #endif
+    out_string[total_bytes_read] = '\0';
     return out_string;
 }
 
@@ -786,6 +833,11 @@ bool nxai_check_process_status( nxai_process_t process, int *status ) {
     DWORD exitCode;
     if ( GetExitCodeProcess( hProcess, &exitCode ) ) {
         *status = exitCode;
+    } else {
+        char error_string[1024];
+        DWORD error_length = get_windows_error( GetLastError(), error_string, 1024 );
+        nxai_vlog( "Error: Could not get exit code of process: %.*s\n", error_length, error_string );
+        *status = 1;
     }
     CloseHandle( hProcess );
     return exitCode == STILL_ACTIVE;

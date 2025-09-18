@@ -73,6 +73,11 @@ nxai_pipe_t nxai_pipe_get_read_pipe( bidirectional_pipe_t pipe, PIPE_DIRECTION d
 
 bidirectional_pipe_t nxai_initialize_pipe( nxai_pipe_t up_pipe_read, nxai_pipe_t up_pipe_write, nxai_pipe_t down_pipe_read, nxai_pipe_t down_pipe_write );
 
+#if defined( _MSC_VER )
+nxai_pipe_t nxai_create_empty_pipe();
+bool nxai_create_pipe_handles( HANDLE *read_handle, HANDLE *write_handle );
+#endif
+
 bidirectional_pipe_t nxai_create_pipe( int *error );
 
 size_t nxai_pipe_timed_read_any( bidirectional_pipe_t *pipes_array, size_t pipes_length, PIPE_DIRECTION direction, int8_t *return_byte );

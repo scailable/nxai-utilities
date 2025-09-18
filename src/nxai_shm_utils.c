@@ -210,11 +210,52 @@ bidirectional_pipe_t nxai_initialize_pipe( nxai_pipe_t up_pipe_read, nxai_pipe_t
 }
 
 #if defined( _MSC_VER )
-static nxai_pipe_t create_pipe() {
+nxai_pipe_t nxai_create_empty_pipe() {
     nxai_pipe_t new_pipe = malloc( sizeof( _nxai_pipe_t ) );
     *new_pipe = (_nxai_pipe_t) NXAI_PIPE_INITIALIZER;
     return new_pipe;
 }
+
+bool nxai_create_pipe_handles( HANDLE *read_handle, HANDLE *write_handle ) {
+    SECURITY_ATTRIBUTES saAttr;
+    saAttr.nLength = sizeof( SECURITY_ATTRIBUTES );
+    saAttr.bInheritHandle = TRUE;
+    saAttr.lpSecurityDescriptor = NULL;
+    // Create pipe name
+    UCHAR PipeNameBuffer[MAX_PATH];
+    sprintf( PipeNameBuffer,
+             "\\\\.\\Pipe\\NXAI_MODULE_PIPE.%08x.%08x",
+             GetCurrentProcessId(),
+             InterlockedIncrement( &PipeSerialNumber ) );
+    HANDLE ReadPipeHandle = CreateNamedPipeA(
+            PipeNameBuffer,
+            PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
+            PIPE_TYPE_BYTE | PIPE_WAIT,
+            1,  // Number of pipes
+            512,// Out buffer size
+            512,// In buffer size
+            0,  // Timeout in ms
+            &saAttr );
+    if ( !ReadPipeHandle ) {
+        return false;
+    }
+
+    HANDLE WritePipeHandle = CreateFileA(
+            PipeNameBuffer,
+            GENERIC_WRITE,
+            0,// No sharing
+            &saAttr,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL// Template file
+    );
+
+    *read_handle = ReadPipeHandle;
+    *write_handle = WritePipeHandle;
+
+    return true;
+}
+
 #endif
 
 bidirectional_pipe_t nxai_create_pipe( int *error ) {
@@ -227,79 +268,24 @@ bidirectional_pipe_t nxai_create_pipe( int *error ) {
         char read_buffer;
         bool active;
     } nxai_pipe_t;
-    bidirectional_pipe_t created_pipe = { { create_pipe(), create_pipe() },
-                                          { create_pipe(), create_pipe() } };
+    bidirectional_pipe_t created_pipe = { { nxai_create_empty_pipe(), nxai_create_empty_pipe() },
+                                          { nxai_create_empty_pipe(), nxai_create_empty_pipe() } };
 
-    SECURITY_ATTRIBUTES saAttr;
-    saAttr.nLength = sizeof( SECURITY_ATTRIBUTES );
-    saAttr.bInheritHandle = TRUE;
-    saAttr.lpSecurityDescriptor = NULL;
-
-    // Create up pipe name
-    UCHAR UpPipeNameBuffer[MAX_PATH];
-    sprintf( UpPipeNameBuffer,
-             "\\\\.\\Pipe\\NXAI_MODULE_UP.%08x.%08x",
-             GetCurrentProcessId(),
-             InterlockedIncrement( &PipeSerialNumber ) );
-    HANDLE UpReadPipeHandle = CreateNamedPipeA(
-            UpPipeNameBuffer,
-            PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
-            PIPE_TYPE_BYTE | PIPE_WAIT,
-            1,  // Number of pipes
-            512,// Out buffer size
-            512,// In buffer size
-            0,  // Timeout in ms
-            &saAttr );
-    if ( !UpReadPipeHandle ) {
+    // Create UP pipe
+    bool success = nxai_create_pipe_handles( &( created_pipe.up_pipe[0]->handle ), &( created_pipe.up_pipe[1]->handle ) );
+    if ( success == false ) {
+        nxai_vlog( "Error! Couldn't create up pipe handles!\n" );
         *error = -2;
         return created_pipe;
     }
 
-    HANDLE UpWritePipeHandle = CreateFileA(
-            UpPipeNameBuffer,
-            GENERIC_WRITE,
-            0,// No sharing
-            &saAttr,
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL,
-            NULL// Template file
-    );
-
-    created_pipe.up_pipe[0]->handle = UpReadPipeHandle;
-    created_pipe.up_pipe[1]->handle = UpWritePipeHandle;
-
-    // Create down pipe name
-    UCHAR DownPipeNameBuffer[MAX_PATH];
-    sprintf( DownPipeNameBuffer,
-             "\\\\.\\Pipe\\NXAI_MODULE_DOWN.%08x.%08x",
-             GetCurrentProcessId(),
-             InterlockedIncrement( &PipeSerialNumber ) );
-    HANDLE DownReadPipeHandle = CreateNamedPipeA(
-            DownPipeNameBuffer,
-            PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
-            PIPE_TYPE_BYTE | PIPE_WAIT,
-            1,  // Number of pipes
-            512,// Out buffer size
-            512,// In buffer size
-            0,  // Timeout in ms
-            &saAttr );
-    if ( !DownReadPipeHandle ) {
+    // Create DOWN pipe
+    success = nxai_create_pipe_handles( &( created_pipe.down_pipe[0]->handle ), &( created_pipe.down_pipe[1]->handle ) );
+    if ( success == false ) {
+        nxai_vlog( "Error! Couldn't create up pipe handles!\n" );
         *error = -2;
         return created_pipe;
     }
-
-    HANDLE DownWritePipeHandle = CreateFileA(
-            DownPipeNameBuffer,
-            GENERIC_WRITE,
-            0,// No sharing
-            &saAttr,
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL,
-            NULL// Template file
-    );
-
-    created_pipe.down_pipe[0]->handle = DownReadPipeHandle;
-    created_pipe.down_pipe[1]->handle = DownWritePipeHandle;
 
     *error = 0;
     return created_pipe;
