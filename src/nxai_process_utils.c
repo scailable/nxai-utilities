@@ -424,7 +424,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
                 rotating_logfile = NULL;
                 int result = rename( _rotating_log_filepath, _old_logfile_path );
                 if ( result != 0 ) {
-                    perror( "Error renaming file" );
+                    fprintf( stderr, "Error renaming file: %s\n", strerror( errno ) );
                     nxai_unlock_mutex( &rotating_logfile_lock );
                     return;
                 }
@@ -432,7 +432,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
             // Create new log file
             rotating_logfile = fopen( _rotating_log_filepath, "w" );
             if ( rotating_logfile == NULL ) {
-                perror( "Error creating log file" );
+                fprintf( stderr, "Error creating log file" );
                 nxai_unlock_mutex( &rotating_logfile_lock );
                 return;
             }
@@ -879,7 +879,7 @@ void nxai_unlock_mutex( nxai_mutex_t *mutex ) {
 nxai_mutex_t nxai_initialize_mutex() {
 #if defined( _MSC_VER )
     // Windows implementation using CreateMutex
-    return CreateMutex( NULL, FALSE, NULL );
+    return CreateMutexA( NULL, FALSE, NULL );
 #else
     // Linux implementation using pthread_mutex_t
     static pthread_mutex_t new_mutex = PTHREAD_MUTEX_INITIALIZER;
