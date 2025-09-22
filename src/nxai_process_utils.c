@@ -422,6 +422,7 @@ static void nxai_vvlog( const char *fmt, va_list *args ) {
             if ( rotating_logfile != NULL ) {
                 fclose( rotating_logfile );
                 rotating_logfile = NULL;
+                remove( _old_logfile_path );
                 int result = rename( _rotating_log_filepath, _old_logfile_path );
                 if ( result != 0 ) {
                     fprintf( stderr, "Error renaming file: %s\n", strerror( errno ) );
@@ -533,7 +534,7 @@ nxai_process_t nxai_start_process( char *const argv[], bool connect_console, nxa
     }
 
     // Connect stderr to the provided pipe
-    if ( stderr_pipe != NULL ) {
+    if ( stderr_pipe != NULL && false ) {
         // Initialize stderr_pipe and handles
         HANDLE hWritePipe;
         *stderr_pipe = nxai_create_empty_pipe();
