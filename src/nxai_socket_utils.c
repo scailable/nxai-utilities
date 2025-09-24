@@ -1,6 +1,6 @@
 #include "nxai_socket_utils.h"
 
-#include "nxai_process_utils.h"
+#include "nxai_utils.h"
 
 #include <errno.h>
 #include <stdbool.h>

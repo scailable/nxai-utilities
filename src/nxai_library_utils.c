@@ -2,6 +2,7 @@
 // Windows stuff
 #include <windows.h>
 #else
+#define _GNU_SOURCE
 #include <dlfcn.h>
 #endif
 
