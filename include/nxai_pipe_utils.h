@@ -25,9 +25,10 @@ typedef struct {
     HANDLE handle;
     char read_buffer;
     bool active;
+    bool pending;
 } _nxai_pipe_t;
 typedef _nxai_pipe_t *nxai_pipe_t;
-#define NXAI_PIPE_INITIALIZER { { 0 }, INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE, 0, false }
+#define NXAI_PIPE_INITIALIZER { { 0 }, INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE, 0, false, false }
 #else
 typedef int nxai_pipe_t;
 #endif

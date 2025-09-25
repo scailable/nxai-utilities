@@ -215,6 +215,27 @@ size_t nxai_pipe_timed_read_any( bidirectional_pipe_t *pipes_array, size_t pipes
         return pipes_length;
     }
 
+    // First check if any pipes are pending from the previous operation
+    for ( size_t pipe_index = 0; pipe_index < pipes_length; pipe_index++ ) {
+        nxai_pipe_t read_pipe = nxai_pipe_get_read_pipe( pipes_array[pipe_index], direction );
+        if ( read_pipe->pending == true ) {
+            read_pipe->pending = false;
+            // Get the result of the completed operation
+            DWORD bytesRead = 0;
+            if ( GetOverlappedResult( read_pipe->handle,
+                                      &( read_pipe->overlap ),
+                                      &bytesRead,
+                                      TRUE ) ) {
+                if ( bytesRead > 0 ) {
+                    *return_byte = read_pipe->read_buffer;
+                }
+            }
+            CloseHandle( read_pipe->overlap.hEvent );
+            // If there are more pending pipes they will be picked up next time this function is called
+            return pipe_index;
+        }
+    }
+
     HANDLE *handles = (HANDLE *) malloc( sizeof( HANDLE ) * pipes_length );
 
     // Initialize OVERLAPPED structures
@@ -262,18 +283,23 @@ size_t nxai_pipe_timed_read_any( bidirectional_pipe_t *pipes_array, size_t pipes
         nxai_vlog_verbose( "Timed out waiting for pipe read.\n" );
     } else if ( result >= WAIT_OBJECT_0 && result < WAIT_OBJECT_0 + pipes_length ) {
         completed_index = result - WAIT_OBJECT_0;
+        // Check if other pipes became available as well and mark as pending
+        for ( size_t check_index = completed_index + 1; check_index < pipes_length; check_index++ ) {
+            nxai_pipe_t check_pipe = nxai_pipe_get_read_pipe( pipes_array[completed_index], direction );
+            DWORD wait_result = WaitForSingleObject( check_pipe->handle, 0 );
+            if ( wait_result == WAIT_OBJECT_0 ) {
+                check_pipe->pending = true;
+            }
+        }
         //Signal no longer waiting for result on this pipe
-        nxai_vlog( "Completed: %zu\n", completed_index );
         nxai_pipe_t completed_pipe = nxai_pipe_get_read_pipe( pipes_array[completed_index], direction );
         completed_pipe->active = false;
         // Get the result of the completed operation
         DWORD bytesRead = 0;
-        nxai_vlog( "Getting overlapped: \n" );
         if ( GetOverlappedResult( completed_pipe->handle,
                                   &( completed_pipe->overlap ),
                                   &bytesRead,
                                   TRUE ) ) {
-            nxai_vlog( "Bytes read: %zu %d\n", bytesRead, completed_pipe->read_buffer );
             if ( bytesRead > 0 ) {
                 *return_byte = completed_pipe->read_buffer;
             }
