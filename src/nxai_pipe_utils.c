@@ -113,9 +113,9 @@ bool nxai_create_pipe_handles( HANDLE *read_handle, HANDLE *write_handle ) {
     saAttr.bInheritHandle = TRUE;
     saAttr.lpSecurityDescriptor = NULL;
     // Create pipe name
-    UCHAR PipeNameBuffer[MAX_PATH];
+    char PipeNameBuffer[MAX_PATH];
     sprintf( PipeNameBuffer,
-             "\\\\.\\Pipe\\NXAI_MODULE_PIPE.%08x.%08x",
+             "\\\\.\\Pipe\\NXAI_MODULE_PIPE.%08lu.%08lu",
              GetCurrentProcessId(),
              InterlockedIncrement( &PipeSerialNumber ) );
     HANDLE ReadPipeHandle = CreateNamedPipeA(

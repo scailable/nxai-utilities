@@ -39,11 +39,13 @@ char *nxai_shm_id_to_string( nxai_shm_t shm );
 
 nxai_shm_t nxai_shm_id_from_string( const char *str );
 
+bool nxai_shm_is_valid( const nxai_shm_t *shm );
+
 nxai_shm_t nxai_shm_create_random( size_t size );
 
 bool nxai_shm_get_id( nxai_shm_t *shm );
 
-bool nxai_shm_valid( void *shm_buffer );
+bool nxai_shm_pointer_valid( void *shm_buffer );
 
 void *nxai_shm_attach( nxai_shm_t shm );
 

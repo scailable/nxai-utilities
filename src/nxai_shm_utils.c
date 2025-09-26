@@ -97,6 +97,24 @@ nxai_shm_t nxai_shm_id_from_string( const char *str ) {
     return shm;
 }
 
+bool nxai_shm_is_valid( const nxai_shm_t *shm ) {
+#if defined( _MSC_VER )
+    // Windows implementation
+    if ( shm->id == NULL ) {
+        return false;
+    } else {
+        return true;
+    }
+#else
+    // Linux implementation
+    if ( shm->id == -1 ) {
+        return false;
+    } else {
+        return true;
+    }
+#endif
+}
+
 nxai_shm_t nxai_shm_create_random( size_t size ) {
     // Seed randomizer to ensure unique SHM names
     srand( nxai_current_timestamp_us() );
@@ -219,7 +237,7 @@ bool nxai_shm_get_id( nxai_shm_t *shm ) {
 #endif
 }
 
-bool nxai_shm_valid( void *shm_buffer ) {
+bool nxai_shm_pointer_valid( void *shm_buffer ) {
 #if defined( _MSC_VER )
     // Windows implementation
     return shm_buffer != NULL;// In Windows the pointer will be NULL if mapping failed
