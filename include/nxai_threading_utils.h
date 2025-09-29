@@ -47,6 +47,10 @@ void nxai_unlock_mutex( nxai_mutex_t *mutex );
 
 nxai_mutex_t nxai_initialize_mutex();
 
+void nxai_atomic_increment( int *number );
+
+void nxai_atomic_decrement( int *number );
+
 #ifdef __cplusplus
 }
 #endif

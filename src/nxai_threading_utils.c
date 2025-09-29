@@ -24,6 +24,9 @@
 #include <tchar.h>
 #include <strsafe.h>
 #include <direct.h>
+// Definitions relating to atomic incrementing/decrementing
+#define atomic_inc( ptr ) InterlockedExchangeAdd( ( ptr ), 1 )
+#define atomic_dec( ptr ) InterlockedExchangeAdd( ( ptr ), -1 )
 #else
 // Linux specific imports
 #include <spawn.h>
@@ -32,6 +35,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <sys/prctl.h>
+// Definitions relating to atomic incrementing/decrementing
+#define atomic_inc( ptr ) __sync_fetch_and_add( ( ptr ), 1 )
+#define atomic_dec( ptr ) __sync_fetch_and_sub( ( ptr ), 1 )
 #endif
 
 #ifdef NXAI_DEBUG
@@ -107,4 +113,12 @@ nxai_mutex_t nxai_initialize_mutex() {
     static pthread_mutex_t new_mutex = PTHREAD_MUTEX_INITIALIZER;
     return new_mutex;
 #endif
+}
+
+void nxai_atomic_increment( int *number ) {
+    atomic_inc( number );
+}
+
+void nxai_atomic_decrement( int *number ) {
+    atomic_dec( number );
 }
