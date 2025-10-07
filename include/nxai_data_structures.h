@@ -7,34 +7,39 @@
 extern "C" {
 #endif
 
-typedef struct score_object_t {
-    char *class_name;
+typedef struct score_object_t
+{
+    char* class_name;
     float score;
 } score_object_t;
 
-typedef struct count_object_t {
-    char *class_name;
+typedef struct count_object_t
+{
+    char* class_name;
     size_t count;
 } count_object_t;
 
-typedef struct bbox_object_t {
-    char *class_name;
-    char *format;
+typedef struct bbox_object_t
+{
+    char* class_name;
+    char* format;
     size_t coords_length;
-    float *coordinates;
-    float *confidences;
+    float* coordinates;
+    float* confidences;
 } bbox_object_t;
 
-typedef struct tensor_object_t {
-    char *name;
+typedef struct tensor_object_t
+{
+    char* name;
     size_t rank;
-    size_t *shape;
+    size_t* shape;
     size_t type;
-    char *data;
+    char* data;
     size_t size;
 } tensor_object_t;
 
-enum nxai_data_type {
+enum nxai_data_type
+{
     DATA_TYPE_FLOAT = 1,
     DATA_TYPE_UINT8 = 2,
     DATA_TYPE_INT8 = 3,
@@ -49,14 +54,15 @@ enum nxai_data_type {
     DATA_TYPE_UINT64 = 13
 };
 
-typedef struct nxai_output_object_t {
+typedef struct nxai_output_object_t
+{
     size_t num_outputs;
-    tensor_object_t *outputs;
-    bbox_object_t *bboxes;
+    tensor_object_t* outputs;
+    bbox_object_t* bboxes;
     size_t num_classes;
-    count_object_t *counts;
+    count_object_t* counts;
     size_t num_counts;
-    score_object_t *scores;
+    score_object_t* scores;
     size_t num_scores;
 } nxai_output_object_t;
 

@@ -13,101 +13,107 @@
 
 #include "nxai_utils.h"
 
-#if defined( _MSC_VER )
-// Windows specific imports
-#include <handleapi.h>
-#include <ioapiset.h>
-#include <processthreadsapi.h>
-#include <synchapi.h>
-#include <windows.h>
-#include <io.h>
-#include <tchar.h>
-#include <strsafe.h>
-#include <direct.h>
-// Definitions relating to atomic incrementing/decrementing
-#define atomic_inc( ptr ) InterlockedExchangeAdd( ( ptr ), 1 )
-#define atomic_dec( ptr ) InterlockedExchangeAdd( ( ptr ), -1 )
+#if defined(_MSC_VER)
+    // Windows specific imports
+    #include <direct.h>
+    #include <handleapi.h>
+    #include <io.h>
+    #include <ioapiset.h>
+    #include <processthreadsapi.h>
+    #include <strsafe.h>
+    #include <synchapi.h>
+    #include <tchar.h>
+    #include <windows.h>
+    // Definitions relating to atomic incrementing/decrementing
+    #define atomic_inc(ptr) InterlockedExchangeAdd((ptr), 1)
+    #define atomic_dec(ptr) InterlockedExchangeAdd((ptr), -1)
 #else
-// Linux specific imports
-#include <spawn.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <sys/prctl.h>
-// Definitions relating to atomic incrementing/decrementing
-#define atomic_inc( ptr ) __sync_fetch_and_add( ( ptr ), 1 )
-#define atomic_dec( ptr ) __sync_fetch_and_sub( ( ptr ), 1 )
+    // Linux specific imports
+    #include <spawn.h>
+    #include <sys/prctl.h>
+    #include <sys/stat.h>
+    #include <sys/time.h>
+    #include <sys/wait.h>
+    #include <unistd.h>
+    // Definitions relating to atomic incrementing/decrementing
+    #define atomic_inc(ptr) __sync_fetch_and_add((ptr), 1)
+    #define atomic_dec(ptr) __sync_fetch_and_sub((ptr), 1)
 #endif
 
 #ifdef NXAI_DEBUG
-#include "memory_leak_detector.h"
+    #include "memory_leak_detector.h"
 #endif
 
-void nxai_thread_join( nxai_thread_t thread ) {
-#if defined( _MSC_VER )
+void nxai_thread_join(nxai_thread_t thread)
+{
+#if defined(_MSC_VER)
     // Windows implementation
-    WaitForSingleObject( thread, INFINITE );
+    WaitForSingleObject(thread, INFINITE);
 #else
     // Linux implementation
-    pthread_join( thread, NULL );
+    pthread_join(thread, NULL);
 #endif
 }
 
-bool nxai_thread_create( nxai_thread_t *thread, function_ptr function, void *input_arguments ) {
-#if defined( _MSC_VER )
+bool nxai_thread_create(nxai_thread_t* thread, function_ptr function, void* input_arguments)
+{
+#if defined(_MSC_VER)
     // Windows implementation
     DWORD dwThreadIdArray;
 
     // Create the thread to begin execution on its own.
     *thread = CreateThread(
-            NULL,              // default security attributes
-            0,                 // use default stack size
-            function,          // thread function name
-            input_arguments,   // argument to thread function
-            0,                 // use default creation flags
-            &dwThreadIdArray );// returns the thread identifier
+        NULL, // default security attributes
+        0, // use default stack size
+        function, // thread function name
+        input_arguments, // argument to thread function
+        0, // use default creation flags
+        &dwThreadIdArray); // returns the thread identifier
 
     // Check the return value for success.
-    if ( *thread == NULL ) {
-        nxai_vlog( "Could not create thread!\n" );
+    if (*thread == NULL)
+    {
+        nxai_vlog("Could not create thread!\n");
         return false;
     }
     return true;
 #else
     // Linux implementation
-    int ret = pthread_create( thread, NULL, (void *) function, input_arguments );
+    int ret = pthread_create(thread, NULL, (void*) function, input_arguments);
     return ret == 0;
 #endif
 }
 
 // Lock mutex function
-void nxai_lock_mutex( nxai_mutex_t *mutex ) {
-#if defined( _MSC_VER )
+void nxai_lock_mutex(nxai_mutex_t* mutex)
+{
+#if defined(_MSC_VER)
     // Windows implementation
-    WaitForSingleObject( *mutex, INFINITE );
+    WaitForSingleObject(*mutex, INFINITE);
 #else
     // Linux implementation
-    pthread_mutex_lock( mutex );
+    pthread_mutex_lock(mutex);
 #endif
 }
 
 // Unlock mutex function
-void nxai_unlock_mutex( nxai_mutex_t *mutex ) {
-#if defined( _MSC_VER )
+void nxai_unlock_mutex(nxai_mutex_t* mutex)
+{
+#if defined(_MSC_VER)
     // Windows implementation
-    ReleaseMutex( *mutex );
+    ReleaseMutex(*mutex);
 #else
     // Linux implementation
-    pthread_mutex_unlock( mutex );
+    pthread_mutex_unlock(mutex);
 #endif
 }
 
 // Initialize mutex function
-nxai_mutex_t nxai_initialize_mutex() {
-#if defined( _MSC_VER )
+nxai_mutex_t nxai_initialize_mutex()
+{
+#if defined(_MSC_VER)
     // Windows implementation using CreateMutex
-    return CreateMutexA( NULL, FALSE, NULL );
+    return CreateMutexA(NULL, FALSE, NULL);
 #else
     // Linux implementation using pthread_mutex_t
     static pthread_mutex_t new_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -115,10 +121,12 @@ nxai_mutex_t nxai_initialize_mutex() {
 #endif
 }
 
-void nxai_atomic_increment( int *number ) {
-    atomic_inc( number );
+void nxai_atomic_increment(int* number)
+{
+    atomic_inc(number);
 }
 
-void nxai_atomic_decrement( int *number ) {
-    atomic_dec( number );
+void nxai_atomic_decrement(int* number)
+{
+    atomic_dec(number);
 }

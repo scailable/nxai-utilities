@@ -4,20 +4,20 @@
 extern "C" {
 #endif
 
-#include "mpack.h"
-#include "yyjson.h"
-
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
 
-mpack_tree_t *copy_yyjson_to_mpack( yyjson_val *input_object );
+#include "mpack.h"
+#include "yyjson.h"
 
-mpack_tree_t *copy_mpack_node( mpack_node_t input_node );
+mpack_tree_t* copy_yyjson_to_mpack(yyjson_val* input_object);
 
-void print_mpack_object( mpack_node_t node );
+mpack_tree_t* copy_mpack_node(mpack_node_t input_node);
 
-void copy_mpack_object_recursive( mpack_node_t node, mpack_writer_t *writer );
+void print_mpack_object(mpack_node_t node);
+
+void copy_mpack_object_recursive(mpack_node_t node, mpack_writer_t* writer);
 
 #ifdef __cplusplus
 }
