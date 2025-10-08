@@ -12,7 +12,6 @@
 
 #if defined(_MSC_VER)
     // Windows stuff
-    #define WIN32_LEAN_AND_MEAN
     #include <afunix.h>
     #include <basetsd.h>
     #include <errno.h>
@@ -207,7 +206,7 @@ nxai_socket_t nxai_socket_create_listener(const char* socket_path)
         char error_string[1024];
         DWORD error_length = get_windows_error(WSAGetLastError(), error_string, 1024);
         nxai_vlog("Error: Sender socket error: %.*s\n", error_length, error_string);
-        return -1;
+        return INVALID_SOCKET;
     }
 
     // Set up address structure
@@ -223,7 +222,7 @@ nxai_socket_t nxai_socket_create_listener(const char* socket_path)
         DWORD error_length = get_windows_error(WSAGetLastError(), error_string, 1024);
         nxai_vlog("Error: Sender socket bind error: %.*s\n", error_length, error_string);
         closesocket(socket_fd);
-        return -1;
+        return INVALID_SOCKET;
     }
 
     // Set security attributes
@@ -245,7 +244,7 @@ nxai_socket_t nxai_socket_create_listener(const char* socket_path)
         DWORD error_length = get_windows_error(WSAGetLastError(), error_string, 1024);
         nxai_vlog("Error: Failed to set receive timeout: %.*s\n", error_length, error_string);
         closesocket(socket_fd);
-        return -1;
+        return INVALID_SOCKET;
     }
 
     // Set send timeout
@@ -261,7 +260,7 @@ nxai_socket_t nxai_socket_create_listener(const char* socket_path)
         DWORD error_length = get_windows_error(WSAGetLastError(), error_string, 1024);
         nxai_vlog("Error: Failed to set send timeout: %.*s\n", error_length, error_string);
         closesocket(socket_fd);
-        return -1;
+        return INVALID_SOCKET;
     }
 
     // Start listening on socket
@@ -270,7 +269,7 @@ nxai_socket_t nxai_socket_create_listener(const char* socket_path)
         closesocket(socket_fd);
         errno = win32_error_to_errno(WSAGetLastError());
         nxai_vlog("Error: Sender socket listen error.\n");
-        return -1;
+        return INVALID_SOCKET;
     }
 
     return socket_fd;
@@ -715,7 +714,7 @@ nxai_socket_t nxai_socket_connect(const char* socket_path)
     if (socket_fd == INVALID_SOCKET)
     {
         nxai_vlog("Warning: socket() creation failed\n");
-        return -1;
+        return INVALID_SOCKET;
     }
 
     // Set timeouts
@@ -751,7 +750,7 @@ nxai_socket_t nxai_socket_connect(const char* socket_path)
             error_length,
             error_string);
         closesocket(socket_fd);
-        return -1;
+        return INVALID_SOCKET;
     }
 
     return socket_fd;

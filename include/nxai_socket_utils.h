@@ -10,7 +10,6 @@ extern "C" {
 
 #if defined(_MSC_VER)
     // Windows specific definitions
-    #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
     #include <winsock2.h>
 typedef SOCKET nxai_socket_t;
