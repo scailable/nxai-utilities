@@ -32,13 +32,12 @@
     #include <sys/time.h>
     #include <sys/wait.h>
     #include <unistd.h>
+extern char** environ;
 #endif
 
 #ifdef NXAI_DEBUG
     #include "memory_leak_detector.h"
 #endif
-
-extern char** environ;
 
 void nxai_ensure_child_cleanup()
 {
