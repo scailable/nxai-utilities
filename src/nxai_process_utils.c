@@ -90,7 +90,7 @@ static char* convert_input_arguments(char* const argv[])
         return NULL;
     }
     // Alloc string
-    char* argument_string = malloc(string_length * sizeof(char));
+    char* argument_string = (char*) malloc(string_length * sizeof(char));
     // Generate string
     index = 0;
     size_t current_index = 0;
@@ -118,6 +118,8 @@ nxai_process_t nxai_start_process(
     nxai_pipe_t* stderr_pipe)
 {
 #if defined(_MSC_VER)
+    nxai_process_t new_process = {.process_id = 1, .job_handle = NULL};
+
     // Windows implementation
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
@@ -166,7 +168,7 @@ nxai_process_t nxai_start_process(
             error_length,
             error_string);
         free(argument_string);
-        return (nxai_process_t) {1, NULL};
+        return new_process;
     }
 
     // Configure job object limits
@@ -189,7 +191,7 @@ nxai_process_t nxai_start_process(
             "Error: Could not set information for job object: %.*s\n",
             error_length,
             error_string);
-        return (nxai_process_t) {1, NULL};
+        return new_process;
     }
 
     // Create process suspended
@@ -212,7 +214,7 @@ nxai_process_t nxai_start_process(
         char error_string[1024];
         DWORD error_length = get_windows_error(GetLastError(), error_string, 1024);
         nxai_vlog("Error: Could not start process: %.*s\n", error_length, error_string);
-        return (nxai_process_t) {1, NULL};
+        return new_process;
     }
 
     // Assign suspended process to job object
@@ -223,7 +225,7 @@ nxai_process_t nxai_start_process(
         CloseHandle(pi.hThread);
         CloseHandle(job_handle);
         free(argument_string);
-        return (nxai_process_t) {1, NULL};
+        return new_process;
     }
 
     ResumeThread(pi.hThread);
@@ -231,7 +233,8 @@ nxai_process_t nxai_start_process(
     CloseHandle(pi.hProcess);
     free(argument_string);
 
-    nxai_process_t new_process = {.process_id = pi.dwProcessId, .job_handle = job_handle};
+    new_process.process_id = pi.dwProcessId;
+    new_process.job_handle = job_handle;
     return new_process;
 #else
     // Linux implementation

@@ -45,7 +45,7 @@ char* nxai_shm_key_to_string(nxai_shm_t shm)
 #if defined(_MSC_VER)
     // Windows implementation
     // Copy string so it can be freed
-    char* shm_key_string = malloc(strlen(shm.key));
+    char* shm_key_string = (char*) malloc(strlen(shm.key));
     strcpy(shm_key_string, shm.key);
 #else
     // Linux implementation
@@ -58,7 +58,7 @@ void nxai_shm_key_from_string(nxai_shm_t* shm, const char* str)
 {
 #if defined(_MSC_VER)
     // Windows implementation
-    shm->key = malloc(sizeof(char) * MAX_PATH);
+    shm->key = (char*) malloc(sizeof(char) * MAX_PATH);
     strcpy(shm->key, str);
 #else
     // Linux implementation
@@ -131,12 +131,12 @@ bool nxai_shm_is_valid(const nxai_shm_t* shm)
 nxai_shm_t nxai_shm_create_random(size_t size)
 {
     // Seed randomizer to ensure unique SHM names
-    srand(nxai_current_timestamp_us());
+    srand((unsigned int) nxai_current_timestamp_us());
 #if defined(_MSC_VER)
     // Windows implementation
     nxai_shm_t new_shm;
     new_shm.id = NULL;
-    new_shm.key = malloc(sizeof(char) * MAX_PATH);
+    new_shm.key = (char*) malloc(sizeof(char) * MAX_PATH);
 
     SECURITY_ATTRIBUTES saAttr;
     saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);

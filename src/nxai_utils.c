@@ -13,7 +13,6 @@
 
 #if defined(_MSC_VER)
     // Windows stuff
-    #define WIN32_LEAN_AND_MEAN
     #include <basetsd.h>
     #include <direct.h>
     #include <errno.h>
@@ -150,7 +149,7 @@ bool nxai_get_file_size(const char* filepath, size_t* file_size)
 #if defined(_MSC_VER)
     // Windows specific implementation
     WIN32_FIND_DATA fileData;
-    HANDLE hFile = FindFirstFile(filepath, &fileData);
+    HANDLE hFile = FindFirstFileA(filepath, &fileData);
 
     if (hFile != INVALID_HANDLE_VALUE)
     {
@@ -380,7 +379,7 @@ char* _nxai_path_join(int arg_count, ...)
     va_end(args);
 
     // Allocate memory for result
-    result = malloc(total_length + 1);
+    result = (char*) malloc(total_length + 1);
     if (!result)
     {
         return NULL;
@@ -461,10 +460,10 @@ DWORD get_windows_error(DWORD errorCode, char* buffer, DWORD bufferSize)
 }
 #endif
 
-char* nxai_sprintf(size_t initial_size, char* fmt, ...)
+char* nxai_sprintf(size_t initial_size, const char* fmt, ...)
 {
     // Initial allocation
-    char* return_string = malloc(initial_size);
+    char* return_string = (char*) malloc(initial_size);
     if (!return_string)
     {
         return NULL;
@@ -481,7 +480,7 @@ char* nxai_sprintf(size_t initial_size, char* fmt, ...)
     if (len >= initial_size)
     {
         // Need larger buffer
-        return_string = realloc(return_string, len + 1);
+        return_string = (char*) realloc(return_string, len + 1);
         if (!return_string)
         {
             return NULL;

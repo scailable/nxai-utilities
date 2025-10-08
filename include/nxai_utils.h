@@ -18,12 +18,6 @@ extern "C" {
     #include <sys/types.h>
 #endif
 
-#ifdef NXAI_DEBUG
-    #define debug_vlog(fmt, args...) nxai_vlog(fmt, ##args)
-#else
-    #define debug_vlog(fmt, args...) /* Don't do anything in release builds */
-#endif
-
 char* _nxai_path_join(int arg_count, ...);
 
 // Helper macro to count arguments
@@ -170,7 +164,7 @@ char* _nxai_path_join(int arg_count, ...);
 // Wrapper macro to handle the actual function call
 #define nxai_path_join(...) _nxai_path_join(PP_NARG(__VA_ARGS__), __VA_ARGS__)
 
-char* nxai_sprintf(size_t initial_size, char* fmt, ...);
+char* nxai_sprintf(size_t initial_size, const char* fmt, ...);
 
 char* nxai_pointer_to_string(void* pointer);
 

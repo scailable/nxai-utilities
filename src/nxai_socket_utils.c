@@ -385,7 +385,8 @@ void nxai_socket_receive_on_connection(
     // Allocate space for incoming message
     if ((*message_length) > (*allocated_buffer_size) || (*message_input_buffer) == NULL)
     {
-        char* new_pointer = realloc(*message_input_buffer, (*message_length) * sizeof(char));
+        char* new_pointer =
+            (char*) realloc(*message_input_buffer, (*message_length) * sizeof(char));
         if (new_pointer == NULL)
         {
             printf(
@@ -438,7 +439,8 @@ void nxai_socket_receive_on_connection(
     if ((*message_length) > (*allocated_buffer_size) || (*message_input_buffer) == NULL)
     {
         // Incoming message is larger than allocated buffer. Reallocate.
-        char* new_pointer = realloc((*message_input_buffer), (*message_length) * sizeof(char));
+        char* new_pointer =
+            (char*) realloc((*message_input_buffer), (*message_length) * sizeof(char));
         if (new_pointer == NULL)
         {
             printf(

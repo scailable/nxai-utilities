@@ -138,7 +138,7 @@ mpack_tree_t* copy_yyjson_to_mpack(yyjson_val* input_object)
         return NULL;
     }
 
-    mpack_tree_t* tree = malloc(sizeof(mpack_tree_t));
+    mpack_tree_t* tree = (mpack_tree_t*) malloc(sizeof(mpack_tree_t));
     mpack_tree_init_data(tree, new_buffer, buffer_length);
     mpack_tree_parse(tree);
 
@@ -162,7 +162,7 @@ mpack_tree_t* copy_mpack_node(mpack_node_t input_node)
             mpack_error_to_string(mpack_writer_error(&writer)));
     }
 
-    mpack_tree_t* tree = malloc(sizeof(mpack_tree_t));
+    mpack_tree_t* tree = (mpack_tree_t*) malloc(sizeof(mpack_tree_t));
     mpack_tree_init_data(tree, new_buffer, buffer_length);
     mpack_tree_parse(tree);
 

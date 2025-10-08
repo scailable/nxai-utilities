@@ -15,7 +15,6 @@
 
 #if defined(_MSC_VER)
     // Windows stuff
-    #define WIN32_LEAN_AND_MEAN
     #include <basetsd.h>
     #include <errno.h>
 
@@ -56,8 +55,7 @@ nxai_pipe_t nxai_string_to_pipe(const char* str)
     sscanf_s(str, "%p", &hPipe);
 
     // Validate the handle
-    nxai_pipe_t return_pipe = malloc(sizeof(_nxai_pipe_t));
-    *return_pipe = (_nxai_pipe_t) NXAI_PIPE_INITIALIZER;
+    nxai_pipe_t return_pipe = nxai_create_empty_pipe();
     DWORD dflags;
     if (hPipe == INVALID_HANDLE_VALUE || !GetHandleInformation(hPipe, &dflags))
     {
@@ -118,8 +116,14 @@ bidirectional_pipe_t nxai_initialize_pipe(
 #if defined(_MSC_VER)
 nxai_pipe_t nxai_create_empty_pipe()
 {
-    nxai_pipe_t new_pipe = malloc(sizeof(_nxai_pipe_t));
-    *new_pipe = (_nxai_pipe_t) NXAI_PIPE_INITIALIZER;
+    nxai_pipe_t new_pipe = (nxai_pipe_t) malloc(sizeof(_nxai_pipe_t));
+    // Initialize OVERLAPPED structure
+    ZeroMemory(&new_pipe->overlap, sizeof(OVERLAPPED));
+    new_pipe->event = INVALID_HANDLE_VALUE;
+    new_pipe->handle = INVALID_HANDLE_VALUE;
+    new_pipe->read_buffer = 0;
+    new_pipe->active = false;
+    new_pipe->pending = false;
     return new_pipe;
 }
 
@@ -642,7 +646,7 @@ void nxai_pipe_close(bidirectional_pipe_t pipe, PIPE_DIRECTION direction)
 
 char* nxai_read_pipe_to_string(nxai_pipe_t pipe)
 {
-    char* out_string = malloc(sizeof(char) * 1024);
+    char* out_string = (char*) malloc(sizeof(char) * 1024);
     size_t total_bytes_read = 0;
     char buffer[1024];
 #if defined(_MSC_VER)
@@ -680,7 +684,7 @@ char* nxai_read_pipe_to_string(nxai_pipe_t pipe)
             break;
         }
 
-        out_string = realloc(out_string, total_bytes_read + bytes_read + 1);
+        out_string = (char*) realloc(out_string, total_bytes_read + bytes_read + 1);
         memcpy(out_string + total_bytes_read, buffer, bytes_read);
         total_bytes_read += bytes_read;
     }
@@ -689,7 +693,7 @@ char* nxai_read_pipe_to_string(nxai_pipe_t pipe)
     ssize_t bytes_read;
     while ((bytes_read = read(pipe, buffer, sizeof(buffer))) > 0)
     {
-        out_string = realloc(out_string, total_bytes_read + bytes_read + 1);
+        out_string = (char*) realloc(out_string, total_bytes_read + bytes_read + 1);
         memcpy(out_string + total_bytes_read, buffer, bytes_read);
         total_bytes_read += bytes_read;
     }
