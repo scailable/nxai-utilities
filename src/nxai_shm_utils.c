@@ -203,7 +203,7 @@ nxai_shm_t nxai_shm_create(const char* path, int project_id, size_t size)
 #if defined(_MSC_VER)
     // Windows implementation
     nxai_shm_t new_shm;
-    sprintf_s(new_shm.key, MAX_PATH, L"\\\\\\.\\Global\\SHM_%s_%d", path, project_id);
+    sprintf_s(new_shm.key, MAX_PATH, "\\\\\\.\\Global\\SHM_%s_%d", path, project_id);
 
     SECURITY_ATTRIBUTES saAttr;
     saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);

@@ -121,12 +121,12 @@ nxai_mutex_t nxai_initialize_mutex()
 #endif
 }
 
-void nxai_atomic_increment(int* number)
+void nxai_atomic_increment(volatile unsigned int* number)
 {
     atomic_inc(number);
 }
 
-void nxai_atomic_decrement(int* number)
+void nxai_atomic_decrement(volatile unsigned int* number)
 {
     atomic_dec(number);
 }

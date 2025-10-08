@@ -47,9 +47,9 @@ void nxai_unlock_mutex(nxai_mutex_t* mutex);
 
 nxai_mutex_t nxai_initialize_mutex();
 
-void nxai_atomic_increment(int* number);
+void nxai_atomic_increment(volatile unsigned int* number);
 
-void nxai_atomic_decrement(int* number);
+void nxai_atomic_decrement(volatile unsigned int* number);
 
 #ifdef __cplusplus
 }

@@ -46,7 +46,7 @@ void* nxai_load_library_with_namespace(const char* filename, int nsid)
 {
 #if defined(_MSC_VER)
     // Windows implementation using LoadLibraryEx
-    return LoadLibraryEx(
+    return LoadLibraryExA(
         filename,
         NULL,
         LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);

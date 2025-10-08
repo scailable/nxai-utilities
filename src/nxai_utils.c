@@ -148,7 +148,7 @@ bool nxai_get_file_size(const char* filepath, size_t* file_size)
 {
 #if defined(_MSC_VER)
     // Windows specific implementation
-    WIN32_FIND_DATA fileData;
+    WIN32_FIND_DATAA fileData;
     HANDLE hFile = FindFirstFileA(filepath, &fileData);
 
     if (hFile != INVALID_HANDLE_VALUE)
