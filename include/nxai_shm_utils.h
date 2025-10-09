@@ -61,13 +61,6 @@ void nxai_shm_read_from_attached(void* shm_pointer, size_t* data_length, char** 
 
 void* nxai_shm_read(nxai_shm_t* shm, size_t* data_length, char** payload_data);
 
-/**
- * @brief Detaches shared memory from the current process.
- *
- * This function detaches the shared memory from the current process.
- *
- * @param memory_address A pointer to the shared memory.
- */
 void nxai_shm_close(void* memory_address);
 
 int nxai_shm_destroy(const nxai_shm_t* shm);

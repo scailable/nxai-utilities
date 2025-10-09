@@ -221,7 +221,7 @@ static void nxai_vvlog(const char* fmt, va_list* args)
     if (_log_to_console == true)
     {
         // Print to console
-        printf("%s%llu %09llu: ", log_prefix, (uint64_t) timestamp / 1000, duration);
+        printf("%s%lu %09lu: ", log_prefix, (uint64_t) timestamp / 1000, duration);
         vprintf(fmt, *args);
     }
 
@@ -286,7 +286,7 @@ static void nxai_vvlog(const char* fmt, va_list* args)
 
     // Write to logfile
     int bytes_written =
-        fprintf(flogfile, "%s%llu %09llu: ", log_prefix, (uint64_t) timestamp / 1000, duration);
+        fprintf(flogfile, "%s%lu %09lu: ", log_prefix, (uint64_t) timestamp / 1000, duration);
     if (bytes_written < 0)
     {
         printf("Failed to write to log file!\n");
