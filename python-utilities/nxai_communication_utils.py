@@ -3,9 +3,10 @@ from ctypes import wintypes
 import sys
 from typing import Optional, Union, Callable
 import os
+import msgpack
+import struct
 
 script_location = os.path.dirname(os.path.realpath(__file__))
-
 
 # Define platform-specific types
 if sys.platform == "win32":
@@ -51,6 +52,12 @@ class SharedMemoryError(Exception):
 
 
 class SocketError(Exception):
+    """Custom exception for socket operations."""
+
+    pass
+
+
+class SocketTimeout(Exception):
     """Custom exception for socket operations."""
 
     pass
@@ -190,11 +197,18 @@ class SharedMemory:
 # Function prototypes
 def initializeLibrary(library_path: str = None):
 
+    library_search_paths = [
+        os.path.join(os.path.dirname(sys.argv[0]), _utilities_libary_name),
+        os.path.join(os.getcwd(), _utilities_libary_name),
+        os.path.join(script_location, _utilities_libary_name),
+    ]
+
     if library_path is None:
-        if os.path.exists(os.path.join(os.getcwd(), _utilities_libary_name)):
-            library_path = os.path.join(os.getcwd(), _utilities_libary_name)
-        elif os.path.exists(os.path.join(script_location, _utilities_libary_name)):
-            library_path = os.path.join(script_location, _utilities_libary_name)
+        for search_path in library_search_paths:
+            print("Looking for library at path:", search_path)
+            if os.path.exists(search_path):
+                library_path = search_path
+                break
         else:
             print("Error! Could not find", _utilities_libary_name, "! Call 'initializeLibrary' function and provide path to file.")
             raise Exception
@@ -431,7 +445,7 @@ class SocketListener:
             connection_fd = ctypes.c_int(connection_fd)
 
         if connection_fd is None or connection_fd.value <= 0:
-            return None, None
+            raise SocketTimeout
 
         # Get raw address and don't allow ctypes to implicitly convert to bytes until first NULL
         address = ctypes.cast(payload_ptr, ctypes.c_void_p).value
@@ -529,3 +543,28 @@ def set_interrupt_signal(interrupt: bool) -> None:
 
     interrupt_signal = ctypes.c_bool.in_dll(_lib, "nxai_socket_interrupt_signal")
     interrupt_signal.value = interrupt
+
+
+def parseInferenceResults(message: bytes) -> dict:
+    parsed_response = msgpack.unpackb(message)
+    if "BBoxes_xyxy" in parsed_response:
+        for key, value in parsed_response["BBoxes_xyxy"].items():
+            parsed_response["BBoxes_xyxy"][key] = list(struct.unpack("f" * int(len(value) / 4), value))
+    if "Identity" in parsed_response:
+        parsed_response["Identity"] = list(
+            struct.unpack(
+                "f" * int(len(parsed_response["Identity"]) / 4),
+                parsed_response["Identity"],
+            )
+        )
+    return parsed_response
+
+
+def writeInferenceResults(object: dict) -> bytes:
+    if "BBoxes_xyxy" in object:
+        for key, value in object["BBoxes_xyxy"].items():
+            object["BBoxes_xyxy"][key] = struct.pack("f" * len(value), *value)
+    if "Identity" in object:
+        object["Identity"] = struct.pack("f" * len(object["Identity"]), object["Identity"])
+    message_bytes = msgpack.packb(object)
+    return message_bytes
