@@ -353,12 +353,13 @@ class SocketConnection:
 
         # The C function is called, which allocates and fills the buffer
         _lib.nxai_socket_receive_on_connection(self._socket_fd, ctypes.byref(allocated_size), ctypes.byref(payload_ptr), ctypes.byref(message_length))
-
-        if not payload_ptr.value:
+        # Get raw address and don't allow ctypes to implicitly convert to bytes until first NULL
+        address = ctypes.cast(payload_ptr, ctypes.c_void_p).value
+        if not address:
             raise SocketError("Failed to receive data from connection.")
 
         # Copy the data from the C buffer into a Python bytes object
-        result = ctypes.string_at(payload_ptr.value, message_length.value)
+        result = ctypes.string_at(address, message_length.value)
 
         # NOTE: If the C library has a function to free the payload_ptr,
         # it should be called here to prevent memory leaks.
@@ -430,7 +431,7 @@ class SocketListener:
             connection_fd = ctypes.c_int(connection_fd)
 
         if connection_fd is None or connection_fd.value <= 0:
-            raise SocketError("Failed to accept a new connection.")
+            return None, None
 
         # Get raw address and don't allow ctypes to implicitly convert to bytes until first NULL
         address = ctypes.cast(payload_ptr, ctypes.c_void_p).value
