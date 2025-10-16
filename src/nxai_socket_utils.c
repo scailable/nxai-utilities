@@ -15,8 +15,6 @@
     #include <afunix.h>
     #include <basetsd.h>
     #include <errno.h>
-    #include <windows.h>
-    #include <winsock2.h>
     #include <ws2tcpip.h>
 typedef SSIZE_T ssize_t;
 #else

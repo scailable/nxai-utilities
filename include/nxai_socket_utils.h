@@ -10,8 +10,8 @@ extern "C" {
 
 #if defined(_MSC_VER)
     // Windows specific definitions
-    #include <windows.h>
     #include <winsock2.h>
+    #include <windows.h>
 typedef SOCKET nxai_socket_t;
 #else
 // Linux specific definitions

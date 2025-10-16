@@ -11,8 +11,8 @@ extern "C" {
 #if defined(_MSC_VER)
     #include <basetsd.h>
 
-    #include "windows.h"
     #include "winsock2.h"
+    #include "windows.h"
 typedef SSIZE_T ssize_t;
 #else
     #include <sys/shm.h>

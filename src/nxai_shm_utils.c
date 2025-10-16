@@ -17,9 +17,6 @@
     // Windows stuff
     #include <basetsd.h>
     #include <errno.h>
-
-    #include "windows.h"
-    #include "winsock2.h"
 #else
     // Linux stuff
     #include <poll.h>

@@ -12,8 +12,8 @@ extern "C" {
     #define NOMINMAX //< Needed to prevent windows.h define macros min() and max().
     #include <basetsd.h>
 
-    #include "windows.h"
     #include "winsock2.h"
+    #include "windows.h"
 #else
     #include <sys/types.h>
 #endif
