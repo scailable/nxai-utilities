@@ -38,7 +38,7 @@ static uint64_t last_timestamp = 0;
 size_t logfile_max_size_mb = 10;
 static bool start_logfile_full = false;
 static size_t logfile_last_size = 0;
-static bool _log_to_console = false;
+static bool _log_to_console = true;
 static bool _log_to_file = true;
 static int _log_verbosity_level = 1;
 FILE* start_logfile;

@@ -18,7 +18,11 @@ extern "C" {
     #include <sys/types.h>
 #endif
 
-char* _nxai_path_join(int arg_count, ...);
+#if !defined(EXPORT_MACRO)
+#define EXPORT_MACRO 
+#endif
+
+EXPORT_MACRO char* _nxai_path_join(int arg_count, ...);
 
 // Helper macro to count arguments
 #define PP_NARG(...) PP_NARG_(__VA_ARGS__, PP_RSEQ_N())
@@ -164,11 +168,11 @@ char* _nxai_path_join(int arg_count, ...);
 // Wrapper macro to handle the actual function call
 #define nxai_path_join(...) _nxai_path_join(PP_NARG(__VA_ARGS__), __VA_ARGS__)
 
-char* nxai_sprintf(size_t initial_size, const char* fmt, ...);
+EXPORT_MACRO char* nxai_sprintf(size_t initial_size, const char* fmt, ...);
 
-char* nxai_pointer_to_string(void* pointer);
+EXPORT_MACRO char* nxai_pointer_to_string(void* pointer);
 
-void nxai_initialize_logging(
+EXPORT_MACRO void nxai_initialize_logging(
     const char* start_log_filepath,
     const char* rotating_log_filepath,
     const char* log_prefix,
@@ -176,30 +180,30 @@ void nxai_initialize_logging(
     bool log_to_file,
     int log_verbosity_level);
 
-void nxai_finalise_logging();
+EXPORT_MACRO void nxai_finalise_logging();
 
-void nxai_vlog_verbose(const char* fmt, ...);
+EXPORT_MACRO void nxai_vlog_verbose(const char* fmt, ...);
 
-void nxai_error_log(const char* fmt, ...);
+EXPORT_MACRO void nxai_error_log(const char* fmt, ...);
 
-void nxai_vlog(const char* fmt, ...);
+EXPORT_MACRO void nxai_vlog(const char* fmt, ...);
 
-bool nxai_get_file_size(const char* filepath, size_t* file_size);
+EXPORT_MACRO bool nxai_get_file_size(const char* filepath, size_t* file_size);
 
-void nxai_sleep_ms(int milliseconds);
+EXPORT_MACRO void nxai_sleep_ms(int milliseconds);
 
-uint64_t nxai_current_timestamp_ms();
+EXPORT_MACRO uint64_t nxai_current_timestamp_ms();
 
-uint64_t nxai_current_timestamp_us();
+EXPORT_MACRO uint64_t nxai_current_timestamp_us();
 
-void nxai_chdir(const char* path);
+EXPORT_MACRO void nxai_chdir(const char* path);
 
-void nxai_chmod(const char* filepath, int mode);
+EXPORT_MACRO void nxai_chmod(const char* filepath, int mode);
 
-int nxai_strcasecmp(const char* str1, const char* str2);
+EXPORT_MACRO int nxai_strcasecmp(const char* str1, const char* str2);
 
 #if defined(_MSC_VER)
-DWORD get_windows_error(DWORD errorCode, char* buffer, DWORD bufferSize);
+EXPORT_MACRO DWORD get_windows_error(DWORD errorCode, char* buffer, DWORD bufferSize);
 #endif
 
 #ifdef __cplusplus

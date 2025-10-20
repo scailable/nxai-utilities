@@ -37,10 +37,16 @@ target_include_directories(object_library PUBLIC
     $<INSTALL_INTERFACE:include>  # This line is important for the install target
 )
 
+if(WIN32)
+    set(EXPORT_MACRO "__declspec(dllexport)")
+else()
+    set(EXPORT_MACRO "__attribute__((visibility(\"default\")))")
+endif()
+target_compile_definitions(object_library PRIVATE EXPORT_MACRO=${EXPORT_MACRO}) # < for nxLibContext()
+
 # Create the shared and static libraries from the same compiled object files
 add_library(nxai-c-utilities-shared SHARED $<TARGET_OBJECTS:object_library>)
 add_library(nxai-c-utilities STATIC $<TARGET_OBJECTS:object_library>)
-
 
 # =============================================================================
 # INSTALLATION LOGIC

@@ -16,7 +16,6 @@ if sys.platform == "win32":
     _utilities_libary_name = "nxai-c-utilities-shared.dll"
     # On Windows, SOCKET is a UINT_PTR, so ctypes.c_size_t is a safe equivalent
     nxai_socket_t = ctypes.c_size_t
-    _sockets_library_name = "nxai-c-sockets-shared.dll"
 else:
     # Unix/Linux definitions
     shm_id_t = ctypes.c_int
@@ -24,7 +23,6 @@ else:
     _utilities_libary_name = "libnxai-c-utilities-shared.so"
     # On Unix/Linux, socket descriptors are standard integers
     nxai_socket_t = ctypes.c_int
-    _sockets_library_name = "libnxai-c-sockets-shared.so"
 
 
 # Define the function signature for the listener callback
@@ -418,7 +416,7 @@ class SocketListener:
         c_socket_path = self._socket_path.encode("utf-8")
         self._listener_fd = _lib.nxai_socket_create_listener(c_socket_path)
         if isinstance(self._listener_fd, int):
-            self._listener_fd = ctypes.c_int(self._listener_fd)
+            self._listener_fd = nxai_socket_t(self._listener_fd)
 
         if self._listener_fd is None or self._listener_fd.value <= 0:
             raise SocketError(f"Failed to create listener socket at '{self._socket_path}'")
@@ -442,7 +440,7 @@ class SocketListener:
 
         connection_fd = _lib.nxai_socket_await_message(self._listener_fd, ctypes.byref(allocated_size), ctypes.byref(payload_ptr), ctypes.byref(message_length))
         if isinstance(connection_fd, int):
-            connection_fd = ctypes.c_int(connection_fd)
+            connection_fd = nxai_socket_t(connection_fd)
 
         if connection_fd is None or connection_fd.value <= 0:
             raise SocketTimeout

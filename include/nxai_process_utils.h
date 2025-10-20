@@ -10,6 +10,10 @@ extern "C" {
 
 #include "nxai_threading_utils.h"
 
+#if !defined(EXPORT_MACRO)
+#define EXPORT_MACRO 
+#endif
+
 #if defined(_MSC_VER)
     // Windows specific imports
     #define NOMINMAX //< Needed to prevent windows.h define macros min() and max().
@@ -34,20 +38,20 @@ typedef unsigned long nxai_thread_return_t;
 typedef pid_t nxai_process_t;
 #endif
 
-nxai_process_t nxai_start_process(
+EXPORT_MACRO nxai_process_t nxai_start_process(
     char* const argv[],
     bool connect_console,
     nxai_pipe_t* stderr_pipe);
 
-int nxai_process_wait(nxai_process_t process_id, int timeout_seconds);
+EXPORT_MACRO int nxai_process_wait(nxai_process_t process_id, int timeout_seconds);
 
-int nxai_kill_process(nxai_process_t process);
+EXPORT_MACRO int nxai_kill_process(nxai_process_t process);
 
-bool nxai_check_process_status(nxai_process_t process, int* status);
+EXPORT_MACRO bool nxai_check_process_status(nxai_process_t process, int* status);
 
-void nxai_process_set_sigs(void (*handler)(int));
+EXPORT_MACRO void nxai_process_set_sigs(void (*handler)(int));
 
-bool nxai_process_started(nxai_process_t process);
+EXPORT_MACRO bool nxai_process_started(nxai_process_t process);
 
 #ifdef __cplusplus
 }

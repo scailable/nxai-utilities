@@ -179,6 +179,21 @@ uint32_t nxai_socket_send_receive_message(
 #endif
 }
 
+bool nxai_socket_is_valid(const nxai_socket_t* socket) {
+    #if defined(_MSC_VER)
+    // Windows implementation
+    if (*socket == INVALID_SOCKET) {
+        return false;
+    }
+#else
+    // Linux implementation
+    if (*socket == -1) {
+        return false;
+    }
+#endif
+    return true;
+}
+
 nxai_socket_t nxai_socket_create_listener(const char* socket_path)
 {
     // Ensure socket file is deleted
