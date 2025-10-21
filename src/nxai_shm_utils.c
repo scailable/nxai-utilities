@@ -241,7 +241,7 @@ bool nxai_shm_get_id(nxai_shm_t* shm)
     {
         char error_string[1024];
         DWORD error_length = get_windows_error(GetLastError(), error_string, 1024);
-        nxai_vlog("Warning: Could not get SHM ID: %.*s\n", error_length, error_string);
+        nxai_vlog("Warning: Could not get SHM ID with Key %s: %.*s\n",shm->key, error_length, error_string);
         return false;
     }
     else

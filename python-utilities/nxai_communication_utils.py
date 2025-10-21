@@ -184,11 +184,13 @@ class SharedMemory:
         size = ctypes.c_size_t()
         payload_ptr = ctypes.c_char_p()
         data = _lib.nxai_shm_read(ctypes.byref(self._handle), ctypes.byref(size), ctypes.byref(payload_ptr))
+        # Get raw address and don't allow ctypes to implicitly convert to bytes until first NULL
+        address = ctypes.cast(payload_ptr, ctypes.c_void_p).value
 
         if not data:
             raise SharedMemoryError("Failed to read from shared memory")
 
-        result = ctypes.string_at(payload_ptr.value, size.value)
+        result = ctypes.string_at(address, size.value)
         return result
 
 
@@ -275,6 +277,10 @@ def initializeLibrary(library_path: str = None):
     # nxai_socket_initialize_sockets
     _lib.nxai_socket_initialize_sockets.argtypes = []
     _lib.nxai_socket_initialize_sockets.restype = ctypes.c_int
+    
+    # nxai_socket_is_valid
+    _lib.nxai_socket_is_valid.argtypes = [ctypes.POINTER(nxai_socket_t)]
+    _lib.nxai_socket_is_valid.restype = ctypes.c_bool
 
     # nxai_socket_create_listener
     _lib.nxai_socket_create_listener.argtypes = [ctypes.c_char_p]
@@ -367,10 +373,8 @@ class SocketConnection:
         _lib.nxai_socket_receive_on_connection(self._socket_fd, ctypes.byref(allocated_size), ctypes.byref(payload_ptr), ctypes.byref(message_length))
         # Get raw address and don't allow ctypes to implicitly convert to bytes until first NULL
         address = ctypes.cast(payload_ptr, ctypes.c_void_p).value
-        if not address:
-            raise SocketError("Failed to receive data from connection.")
-        if message_length.value == 0:
-            raise SocketError("An error occurred while receiving data.")
+        if not address or message_length.value == 0:
+            raise SocketTimeout("Timed out waiting for message on connection")
 
         # Copy the data from the C buffer into a Python bytes object
         result = ctypes.string_at(address, message_length.value)
@@ -443,10 +447,9 @@ class SocketListener:
         connection_fd = _lib.nxai_socket_await_message(self._listener_fd, ctypes.byref(allocated_size), ctypes.byref(payload_ptr), ctypes.byref(message_length))
         if isinstance(connection_fd, int):
             connection_fd = nxai_socket_t(connection_fd)
-
-        if connection_fd is None or connection_fd.value <= 0:
+        if _lib.nxai_socket_is_valid(ctypes.byref(connection_fd)) == False:
             raise SocketTimeout
-
+        
         # Get raw address and don't allow ctypes to implicitly convert to bytes until first NULL
         address = ctypes.cast(payload_ptr, ctypes.c_void_p).value
         if not address:
