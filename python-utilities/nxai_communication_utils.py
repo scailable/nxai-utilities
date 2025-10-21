@@ -369,6 +369,8 @@ class SocketConnection:
         address = ctypes.cast(payload_ptr, ctypes.c_void_p).value
         if not address:
             raise SocketError("Failed to receive data from connection.")
+        if message_length.value == 0:
+            raise SocketError("An error occurred while receiving data.")
 
         # Copy the data from the C buffer into a Python bytes object
         result = ctypes.string_at(address, message_length.value)

@@ -179,15 +179,18 @@ uint32_t nxai_socket_send_receive_message(
 #endif
 }
 
-bool nxai_socket_is_valid(const nxai_socket_t* socket) {
-    #if defined(_MSC_VER)
+bool nxai_socket_is_valid(const nxai_socket_t* socket)
+{
+#if defined(_MSC_VER)
     // Windows implementation
-    if (*socket == INVALID_SOCKET) {
+    if (*socket == INVALID_SOCKET)
+    {
         return false;
     }
 #else
     // Linux implementation
-    if (*socket == -1) {
+    if (*socket == -1)
+    {
         return false;
     }
 #endif
@@ -213,7 +216,7 @@ nxai_socket_t nxai_socket_create_listener(const char* socket_path)
     WideCharToMultiByte(CP_UTF8, 0, wpath, -1, unix_path, MAX_PATH, NULL, NULL);
 
     // Create socket to listen on
-    socket_fd = WSASocketA(AF_UNIX, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+    socket_fd = WSASocketA(AF_UNIX, SOCK_STREAM, 0, NULL, 0, 0);
     if (socket_fd == INVALID_SOCKET)
     {
         char error_string[1024];
@@ -244,38 +247,6 @@ nxai_socket_t nxai_socket_create_listener(const char* socket_path)
     sa.bInheritHandle = TRUE;
     sa.lpSecurityDescriptor = NULL;
 
-    // Set receive timeout
-    if (setsockopt(
-            socket_fd,
-            SOL_SOCKET,
-            SO_RCVTIMEO,
-            (const char*) &default_socket_timeout,
-            sizeof(default_socket_timeout))
-        == SOCKET_ERROR)
-    {
-        char error_string[1024];
-        DWORD error_length = get_windows_error(WSAGetLastError(), error_string, 1024);
-        nxai_vlog("Error: Failed to set receive timeout: %.*s\n", error_length, error_string);
-        closesocket(socket_fd);
-        return INVALID_SOCKET;
-    }
-
-    // Set send timeout
-    if (setsockopt(
-            socket_fd,
-            SOL_SOCKET,
-            SO_SNDTIMEO,
-            (const char*) &default_socket_timeout,
-            sizeof(default_socket_timeout))
-        == SOCKET_ERROR)
-    {
-        char error_string[1024];
-        DWORD error_length = get_windows_error(WSAGetLastError(), error_string, 1024);
-        nxai_vlog("Error: Failed to set send timeout: %.*s\n", error_length, error_string);
-        closesocket(socket_fd);
-        return INVALID_SOCKET;
-    }
-
     // Start listening on socket
     if (listen(socket_fd, SOMAXCONN) == SOCKET_ERROR)
     {
@@ -296,17 +267,17 @@ nxai_socket_t nxai_socket_create_listener(const char* socket_path)
     int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (socket_fd == -1)
     {
-        printf("Error: Sender socket error.\n");
+        nxai_vlog("Error: Sender socket error.\n");
         return -1;
     }
     if (strlen(socket_path) > sizeof(addr.sun_path) - 1)
     {
-        printf("Error: Sender socket path too long error.\n");
+        nxai_vlog("Error: Sender socket path too long error.\n");
         return -1;
     }
     if (remove(socket_path) == -1 && errno != ENOENT)
     {
-        printf("Error: Sender remove socket error.\n");
+        nxai_vlog("Error: Sender remove socket error.\n");
         return -1;
     }
     memset(&addr, 0, sizeof(struct sockaddr_un));
@@ -317,7 +288,7 @@ nxai_socket_t nxai_socket_create_listener(const char* socket_path)
     // Bind to socket
     if (bind(socket_fd, (struct sockaddr*) &addr, sizeof(struct sockaddr_un)) == -1)
     {
-        printf("Error: Sender socket bind error.\n");
+        nxai_vlog("Error: Sender socket bind error.\n");
         return -1;
     }
 
@@ -327,7 +298,7 @@ nxai_socket_t nxai_socket_create_listener(const char* socket_path)
     // Start listening on socket
     if (listen(socket_fd, 30) == -1)
     {
-        printf("Error: Sender socket listen error.\n");
+        nxai_vlog("Error: Sender socket listen error.\n");
         return -1;
     }
 
@@ -401,9 +372,10 @@ void nxai_socket_receive_on_connection(
             (char*) realloc(*message_input_buffer, (*message_length) * sizeof(char));
         if (new_pointer == NULL)
         {
-            printf(
+            nxai_vlog(
                 "Error: Could not allocate buffer with length: %d. Ignoring message.\n",
                 (*message_length));
+            *message_length = 0;
             return;
         }
         *allocated_buffer_size = *message_length;
@@ -411,13 +383,32 @@ void nxai_socket_receive_on_connection(
     }
 
     // Read the actual message
-    while ((num_read = recv(
-                connection_fd,
-                (*message_input_buffer) + num_read_cumulative,
-                (*message_length) - num_read_cumulative,
-                flags))
-           > 0)
+    while (num_read_cumulative < *message_length)
     {
+        WSAPOLLFD poll_fd = {0};
+        poll_fd.fd = connection_fd;
+        poll_fd.events = POLLRDNORM;
+
+        int poll_result = WSAPoll(&poll_fd, 1, default_socket_timeout.tv_sec * 1000);
+
+        if (poll_result == SOCKET_ERROR)
+        {
+            // Handle poll error
+            *message_length = 0;
+            return;
+        }
+        if (poll_result == 0)
+        {
+            // Handle timeout
+            *message_length = 0;
+            return;
+        }
+
+        num_read = recv(
+            connection_fd,
+            (*message_input_buffer) + num_read_cumulative,
+            (*message_length) - num_read_cumulative,
+            flags);
         num_read_cumulative += num_read;
         if (num_read_cumulative >= *message_length)
             break;
@@ -425,7 +416,13 @@ void nxai_socket_receive_on_connection(
 
     if (num_read == SOCKET_ERROR)
     {
-        printf("Warning: Error when receiving socket message!\n");
+        char error_string[1024];
+        DWORD error_length = get_windows_error(WSAGetLastError(), error_string, 1024);
+        nxai_vlog(
+            "Warning: Error when receiving socket message: %.*s\n",
+            error_length,
+            error_string);
+        *message_length = 0;
     }
 #else
     // Linux implementation
@@ -455,7 +452,7 @@ void nxai_socket_receive_on_connection(
             (char*) realloc((*message_input_buffer), (*message_length) * sizeof(char));
         if (new_pointer == NULL)
         {
-            printf(
+            nxai_vlog(
                 "Error: Could not allocate buffer with length: %d. Ignoring message.\n",
                 (*message_length));
             return;
@@ -484,7 +481,8 @@ void nxai_socket_receive_on_connection(
     }
     if (num_read == -1)
     {
-        printf("Warning: Error when receiving socket message!\n");
+        nxai_vlog("Warning: Error when receiving socket message!\n");
+        *message_length = 0;
     }
 #endif
 }
@@ -638,7 +636,7 @@ int32_t nxai_socket_start_listener(
         // Close connection
         if (closesocket(connection_fd) == SOCKET_ERROR)
         {
-            printf("Warning: Sender socket close error!\n");
+            nxai_vlog("Warning: Sender socket close error!\n");
         }
     }
 
@@ -693,7 +691,7 @@ int32_t nxai_socket_start_listener(
         // Close connection
         if (close(connection_fd) == -1)
         {
-            printf("Warning: Sender socket close error!\n");
+            nxai_vlog("Warning: Sender socket close error!\n");
         }
     }
     free(message_input_buffer);
@@ -730,20 +728,6 @@ nxai_socket_t nxai_socket_connect(const char* socket_path)
         return INVALID_SOCKET;
     }
 
-    // Set timeouts
-    setsockopt(
-        socket_fd,
-        SOL_SOCKET,
-        SO_SNDTIMEO,
-        (const char*) &default_socket_timeout,
-        sizeof(default_socket_timeout));
-    setsockopt(
-        socket_fd,
-        SOL_SOCKET,
-        SO_RCVTIMEO,
-        (const char*) &default_socket_timeout,
-        sizeof(default_socket_timeout));
-
     // Generate socket address
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(struct sockaddr_un));
@@ -773,7 +757,7 @@ nxai_socket_t nxai_socket_connect(const char* socket_path)
     int32_t socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (socket_fd < 0)
     {
-        printf("Warning: socket() creation failed\n");
+        nxai_vlog("Warning: socket() creation failed\n");
         close(socket_fd);
         return -1;
     }
@@ -800,7 +784,7 @@ nxai_socket_t nxai_socket_connect(const char* socket_path)
     // Check if we have access to socket
     if (access(socket_path, F_OK) != 0)
     {
-        printf("Warning: access to socket failed at %s\n", socket_path);
+        nxai_vlog("Warning: access to socket failed at %s\n", socket_path);
         close(socket_fd);
         return -1;
     }
@@ -808,7 +792,7 @@ nxai_socket_t nxai_socket_connect(const char* socket_path)
     // Connect to socket
     if (connect(socket_fd, (struct sockaddr*) &addr, sizeof(struct sockaddr_un)) == -1)
     {
-        printf("Warning: connect to socket [%s] failed: %s\n", socket_path, strerror(errno));
+        nxai_vlog("Warning: connect to socket [%s] failed: %s\n", socket_path, strerror(errno));
         close(socket_fd);
         return -1;
     }
@@ -870,14 +854,14 @@ bool nxai_socket_send_to_connection(
             0);
         if (sent_now == SOCKET_ERROR)
         {
-            printf("Warning: send to socket failed\n");
+            nxai_vlog("Warning: send to socket failed\n");
             return false;
         }
     }
 
     if (header_sent_total != sizeof(message_length))
     {
-        printf("Warning: Could not send header!\n");
+        nxai_vlog("Warning: Could not send header!\n");
         return false;
     }
 
@@ -892,7 +876,7 @@ bool nxai_socket_send_to_connection(
             0);
         if (sent_now == SOCKET_ERROR)
         {
-            printf("Warning: send to socket failed\n");
+            nxai_vlog("Warning: send to socket failed\n");
             return false;
         }
     }
@@ -921,14 +905,14 @@ bool nxai_socket_send_to_connection(
             flags);
         if (sent_now == -1)
         {
-            printf("Warning: send to socket failed\n");
+            nxai_vlog("Warning: send to socket failed\n");
             return false;
         }
     }
 
     if (header_sent_total != sizeof(message_length))
     {
-        printf("Warning: Could not send header!\n");
+        nxai_vlog("Warning: Could not send header!\n");
         return false;
     }
 
@@ -943,7 +927,7 @@ bool nxai_socket_send_to_connection(
             flags);
         if (sent_now == -1)
         {
-            printf("Warning: send to socket failed\n");
+            nxai_vlog("Warning: send to socket failed\n");
             return false;
         }
     }
