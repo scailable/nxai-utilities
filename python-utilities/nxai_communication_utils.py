@@ -100,6 +100,11 @@ class SharedMemory:
             return False
         return _lib.nxai_shm_is_valid(ctypes.byref(self._handle))
 
+    @property
+    def key(self) -> str:
+        key_c = _lib.nxai_shm_key_to_string(self._handle)
+        return key_c.decode("utf-8")
+
     def create(self, size: int) -> None:
         """Create a new shared memory segment"""
         self._handle = _lib.nxai_shm_create_random(ctypes.c_size_t(size))
@@ -277,7 +282,7 @@ def initializeLibrary(library_path: str = None):
     # nxai_socket_initialize_sockets
     _lib.nxai_socket_initialize_sockets.argtypes = []
     _lib.nxai_socket_initialize_sockets.restype = ctypes.c_int
-    
+
     # nxai_socket_is_valid
     _lib.nxai_socket_is_valid.argtypes = [ctypes.POINTER(nxai_socket_t)]
     _lib.nxai_socket_is_valid.restype = ctypes.c_bool
@@ -449,7 +454,7 @@ class SocketListener:
             connection_fd = nxai_socket_t(connection_fd)
         if _lib.nxai_socket_is_valid(ctypes.byref(connection_fd)) == False:
             raise SocketTimeout
-        
+
         # Get raw address and don't allow ctypes to implicitly convert to bytes until first NULL
         address = ctypes.cast(payload_ptr, ctypes.c_void_p).value
         if not address:
