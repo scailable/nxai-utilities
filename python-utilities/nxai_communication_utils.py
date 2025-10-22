@@ -49,6 +49,12 @@ class SharedMemoryError(Exception):
     pass
 
 
+class ExitSignal:
+    """Custom class to signal exit"""
+
+    pass
+
+
 class SocketError(Exception):
     """Custom exception for socket operations."""
 
@@ -466,8 +472,6 @@ class SocketListener:
         connection = SocketConnection(connection_fd, self._socket_path)
         initial_message = ctypes.string_at(address, message_length.value)
 
-        # NOTE: Free the payload_ptr buffer here if required by the C library.
-
         return connection, initial_message
 
     def close(self) -> None:
@@ -555,6 +559,8 @@ def set_interrupt_signal(interrupt: bool) -> None:
 
 def parseInferenceResults(message: bytes) -> dict:
     parsed_response = msgpack.unpackb(message)
+    if "EXIT" in parsed_response:
+        return ExitSignal()
     if "BBoxes_xyxy" in parsed_response:
         for key, value in parsed_response["BBoxes_xyxy"].items():
             parsed_response["BBoxes_xyxy"][key] = list(struct.unpack("f" * int(len(value) / 4), value))
