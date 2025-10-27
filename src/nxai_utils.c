@@ -38,7 +38,7 @@ static uint64_t last_timestamp = 0;
 size_t logfile_max_size_mb = 10;
 static bool start_logfile_full = false;
 static size_t logfile_last_size = 0;
-static bool _log_to_console = false;
+static bool _log_to_console = true;
 static bool _log_to_file = true;
 static int _log_verbosity_level = 1;
 FILE* start_logfile;
@@ -221,7 +221,7 @@ static void nxai_vvlog(const char* fmt, va_list* args)
     if (_log_to_console == true)
     {
         // Print to console
-        printf("%s%llu %09llu: ", log_prefix, (uint64_t) timestamp / 1000, duration);
+        printf("%s%llu %09llu: ", log_prefix, timestamp / 1000, duration);
         vprintf(fmt, *args);
     }
 
@@ -286,7 +286,7 @@ static void nxai_vvlog(const char* fmt, va_list* args)
 
     // Write to logfile
     int bytes_written =
-        fprintf(flogfile, "%s%llu %09llu: ", log_prefix, (uint64_t) timestamp / 1000, duration);
+        fprintf(flogfile, "%s%llu %09llu: ", log_prefix, timestamp / 1000, duration);
     if (bytes_written < 0)
     {
         printf("Failed to write to log file!\n");

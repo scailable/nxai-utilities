@@ -651,7 +651,7 @@ char* nxai_read_pipe_to_string(nxai_pipe_t pipe)
     char buffer[1024];
 #if defined(_MSC_VER)
     // Windows implementation
-    OVERLAPPED ov = {};
+    OVERLAPPED ov = {0};
     ov.Offset = 0;
     ov.OffsetHigh = 0;
 
