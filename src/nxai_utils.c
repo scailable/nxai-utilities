@@ -192,11 +192,10 @@ static void nxai_vvlog(const char* fmt, va_list* args)
 {
     if (_log_verbosity_level == 0 || (_log_to_file == false && _log_to_console == false))
     {
-        // Logging is turned off. Return immediately
         return;
     }
 
-    // Copy argument list
+    // Copy argument list (Needed for using args twice: once for console, once for file)
     va_list copied_args;
     va_copy(copied_args, *args);
 
@@ -220,13 +219,13 @@ static void nxai_vvlog(const char* fmt, va_list* args)
 
     if (_log_to_console == true)
     {
-        // Print to console
-        printf("%s%llu %09llu: ", log_prefix, timestamp / 1000, duration);
+        printf("%s%llu %09llu: ", log_prefix, (uint64_t) timestamp / 1000, duration);
         vprintf(fmt, *args);
     }
 
     if (_start_log_filepath == NULL || _rotating_log_filepath == NULL || _log_to_file == false)
     {
+        va_end(copied_args); // Clean up before return
         return;
     }
 
@@ -238,7 +237,6 @@ static void nxai_vvlog(const char* fmt, va_list* args)
         // Check if start logfile is full
         if ((size_t) logfile_last_size < logfile_max_size_mb * 1000000)
         {
-            // Write to start_log
             flogfile = start_logfile;
         }
         else
@@ -251,60 +249,77 @@ static void nxai_vvlog(const char* fmt, va_list* args)
 
     if (flogfile == NULL)
     {
-        // Start logfile was full, open rotating logfile
+        // Start logfile was full (or not used), use rotating logfile
         nxai_lock_mutex(&rotating_logfile_lock);
+
+        // 1. Check if the file is full and needs clearing
         if ((size_t) logfile_last_size > logfile_max_size_mb * 1000000)
         {
-            // Rotating logfile is full, rename to ".old"
+            // Close existing file handle if open
             if (rotating_logfile != NULL)
             {
                 fclose(rotating_logfile);
                 rotating_logfile = NULL;
-                remove(_old_logfile_path);
-                int result = rename(_rotating_log_filepath, _old_logfile_path);
-                if (result != 0)
-                {
-                    fprintf(stderr, "Error renaming file: %s\n", strerror(errno));
-                    nxai_unlock_mutex(&rotating_logfile_lock);
-                    return;
-                }
             }
-            // Create new log file
+
+            // Open with "w" mode. This TRUNCATES (empties) the file content.
             rotating_logfile = fopen(_rotating_log_filepath, "w");
+
             if (rotating_logfile == NULL)
             {
-                fprintf(stderr, "Error creating log file");
+                fprintf(stderr, "Error clearing/re-opening log file");
                 nxai_unlock_mutex(&rotating_logfile_lock);
+                va_end(copied_args);
                 return;
             }
             logfile_last_size = 0;
         }
+
+        // 2. Safety: Ensure file is open if it wasn't full (e.g. first transition from start_log)
+        if (rotating_logfile == NULL)
+        {
+            // Open in "a" (append) mode so we don't wipe history if it wasn't full yet
+            rotating_logfile = fopen(_rotating_log_filepath, "a");
+            if (rotating_logfile == NULL)
+            {
+                fprintf(stderr, "Error opening log file");
+                nxai_unlock_mutex(&rotating_logfile_lock);
+                va_end(copied_args);
+                return;
+            }
+        }
+
         nxai_unlock_mutex(&rotating_logfile_lock);
-        // Write to rotating log
         flogfile = rotating_logfile;
     }
 
     // Write to logfile
     int bytes_written =
-        fprintf(flogfile, "%s%llu %09llu: ", log_prefix, timestamp / 1000, duration);
+        fprintf(flogfile, "%s%llu %09llu: ", log_prefix, (uint64_t) timestamp / 1000, duration);
     if (bytes_written < 0)
     {
         printf("Failed to write to log file!\n");
+        va_end(copied_args);
         return;
     }
     logfile_last_size += bytes_written;
+
     bytes_written = vfprintf(flogfile, fmt, copied_args);
     if (bytes_written < 0)
     {
         printf("Failed to write to log file!\n");
+        va_end(copied_args);
         return;
     }
     logfile_last_size += bytes_written;
+
     if (_log_verbosity_level > 1)
     {
-        fflush(flogfile); // Flush writing file to make sure latest prints are logged
+        fflush(flogfile);
         fflush(stdout);
     }
+
+    va_end(copied_args); // Standard compliance: Release list
 }
 
 void nxai_sleep_ms(int milliseconds)
