@@ -11,7 +11,7 @@ extern "C" {
 #include "nxai_threading_utils.h"
 
 #if !defined(EXPORT_MACRO)
-#define EXPORT_MACRO 
+    #define EXPORT_MACRO
 #endif
 
 #if defined(_MSC_VER)
@@ -38,10 +38,14 @@ typedef unsigned long nxai_thread_return_t;
 typedef pid_t nxai_process_t;
 #endif
 
-EXPORT_MACRO nxai_process_t nxai_start_process(
-    char* const argv[],
-    bool connect_console,
-    nxai_pipe_t* stderr_pipe);
+#ifdef NXAI_DEBUG
+    #define debug_vlog(fmt, args...) nxai_vlog(fmt, ##args)
+#else
+    #define debug_vlog(fmt, args...) /* Don't do anything in release builds */
+#endif
+
+EXPORT_MACRO nxai_process_t
+    nxai_start_process(char* const argv[], bool connect_console, nxai_pipe_t* stderr_pipe);
 
 EXPORT_MACRO int nxai_process_wait(nxai_process_t process_id, int timeout_seconds);
 
