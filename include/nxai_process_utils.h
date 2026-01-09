@@ -41,7 +41,7 @@ typedef pid_t nxai_process_t;
 #ifdef NXAI_DEBUG
     #define debug_vlog(fmt, args...) nxai_vlog(fmt, ##args)
 #else
-    #define debug_vlog(fmt, args...) /* Don't do anything in release builds */
+    #define debug_vlog(fmt, ...) /* Don't do anything in release builds */
 #endif
 
 EXPORT_MACRO nxai_process_t
