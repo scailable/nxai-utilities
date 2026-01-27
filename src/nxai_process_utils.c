@@ -360,6 +360,7 @@ int nxai_process_wait(nxai_process_t process, int timeout_seconds)
     while (1)
     {
         // Reset timeout for each iteration
+        nxai_vlog("Waiting for process %d to exit...\n", process);
         int sig = sigtimedwait(&mask, NULL, &ts);
 
         if (sig == SIGCHLD)
@@ -382,6 +383,8 @@ int nxai_process_wait(nxai_process_t process, int timeout_seconds)
             break;
         }
     }
+    nxai_vlog("Warning: sigtimedwait interrupted by signal.\n");
+    return -1;
 #endif
 }
 
